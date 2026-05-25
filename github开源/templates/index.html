@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}CAD 插件平台{% endblock %}
+{% block content %}
+<div class="container">
+    <!-- 分类筛选 -->
+    {% if categories %}
+    <div class="filter-bar">
+        <div class="filter-row">
+            <div class="filter-tabs">
+                <a href="/?search={{ search }}&sort={{ sort }}" class="filter-tab {% if category == 0 and tag == 0 %}active{% endif %}">全部</a>
+                {% for c in categories %}
+                <a href="/?category={{ c.id }}&search={{ search }}&sort={{ sort }}" class="filter-tab {% if category == c.id %}active{% endif %}">{{ c.name }}</a>
+                {% endfor %}
+            </div>
+            <div class="filter-search-wrap">
+                <form class="filter-search-form" method="get" action="/" id="filterSearchForm">
+                    {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
+                    {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+                    {% if sort and sort != 'newest' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+                    <button class="filter-search-btn" type="button" id="searchToggleBtn" onclick="toggleSearch()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </button>
+                    <input class="filter-search-input" type="text" name="search" placeholder="搜索插件..." value="{{ search|default('') }}" id="filterSearchInput">
+                </form>
+            </div>
+        </div>
+        {% if category > 0 %}
+        {% set ns = namespace(current_cat=None) %}
+        {% for c in categories %}{% if c.id == category %}{% set ns.current_cat = c %}{% endif %}{% endfor %}
+        {% if ns.current_cat %}
+        <div class="filter-tags">
+            <a href="/?category={{ category }}&search={{ search }}&sort={{ sort }}" class="filter-tag {% if tag == 0 %}active{% endif %}">全部用途</a>
+            {% for t in ns.current_cat.tags %}
+            <a href="/?category={{ category }}&tag={{ t.id }}&search={{ search }}&sort={{ sort }}" class="filter-tag {% if tag == t.id %}active{% endif %}">{{ t.name }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 排序和结果数 -->
+    <div class="toolbar">
+        <span class="result-count">
+            {% if search %}搜索 "{{ search }}" — {% endif %}
+            共 {{ total }} 个插件
+        </span>
+        <div class="sort-bar">
+            <a href="/?search={{ search }}&category={{ category }}&tag={{ tag }}&sort=newest" class="sort-link {% if sort == 'newest' %}active{% endif %}">最新</a>
+            <a href="/?search={{ search }}&category={{ category }}&tag={{ tag }}&sort=downloads" class="sort-link {% if sort == 'downloads' %}active{% endif %}">最热</a>
+            <a href="/?search={{ search }}&category={{ category }}&tag={{ tag }}&sort=name" class="sort-link {% if sort == 'name' %}active{% endif %}">名称</a>
+        </div>
+    </div>
+
+    <!-- 插件列表 -->
+    <!-- 热门下载排行榜 -->
+    {% if hot_plugins and page == 1 and not search and category == 0 %}
+    <div class="hot-section">
+        <div class="hot-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" stroke="none"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span>热门下载</span>
+        </div>
+        <div class="hot-list">
+            {% for p in hot_plugins %}
+            <a href="/plugin/{{ p.id }}" class="hot-item">
+                <span class="hot-rank rank-{{ loop.index }}">{{ loop.index }}</span>
+                <span class="hot-name">{{ p.name }}</span>
+                <span class="hot-dl">{{ p.downloads }} 下载</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if plugins %}
+    <div class="plugin-grid">
+        {% for p in plugins %}
+        <a href="/plugin/{{ p.id }}" class="plugin-card">
+            <div class="plugin-card-top">
+                <span class="plugin-type-badge type-{{ p.file_name.split('.')[-1]|lower }}">{{ p.file_name.split('.')[-1]|upper }}</span>
+                {% if p.tags %}
+                <span class="plugin-tag-label">{{ p.tags[0].name }}</span>
+                {% endif %}
+            </div>
+            <h3 class="plugin-name">{{ p.name }}</h3>
+            <p class="plugin-desc">{{ p.description[:80] + '...' if p.description|length > 80 else p.description or '暂无描述' }}</p>
+            <div class="plugin-meta">
+                <span class="plugin-author">{{ p.author }}</span>
+                <span>{{ p.downloads }} 下载</span>
+            </div>
+            <div class="plugin-footer">
+                <span class="plugin-info">{{ p.size_str }} · v{{ p.version }}</span>
+                <span class="dl-btn" onclick="event.stopPropagation(); window.location.href='/download/{{ p.id }}'">下载</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="/?page={{ page - 1 }}&search={{ search }}&category={{ category }}&tag={{ tag }}&sort={{ sort }}" class="page-link">上一页</a>
+        {% endif %}
+        {% for n in range(1, total_pages + 1) %}
+        <a href="/?page={{ n }}&search={{ search }}&category={{ category }}&tag={{ tag }}&sort={{ sort }}" class="page-link {% if n == page %}page-active{% endif %}">{{ n }}</a>
+        {% endfor %}
+        {% if page < total_pages %}
+        <a href="/?page={{ page + 1 }}&search={{ search }}&category={{ category }}&tag={{ tag }}&sort={{ sort }}" class="page-link">下一页</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% elif not search and category == 0 %}
+    <div class="empty">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="13 2 13 9 20 9"/>
+        </svg>
+        <p>还没有插件，来<a href="/upload">上传第一个</a></p>
+    </div>
+    {% else %}
+    <div class="empty">
+        <p>没有找到匹配的插件</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 全站留言区 -->
+<div class="messages-section">
+    <h2 class="messages-title">留言交流</h2>
+    <p class="messages-hint">欢迎留言</p>
+
+    <div class="messages-form">
+        <form id="msgForm">
+            <input type="hidden" id="msg_parent_id" value="">
+            <div id="msg_reply_to" class="msg-reply-indicator" style="display:none;">
+                <span class="msg-reply-target"></span>
+                <button type="button" class="msg-reply-cancel" onclick="cancelReply()">取消回复</button>
+            </div>
+            <div class="form-group">
+                <input class="form-input" id="msg_author" placeholder="你的昵称（选填）" maxlength="20">
+            </div>
+            <div class="form-group">
+                <textarea class="form-input form-textarea" id="msg_content" rows="3" placeholder="写下你的想法..." maxlength="1000" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">提交留言</button>
+        </form>
+    </div>
+
+    <div id="messages-list" class="messages-list">
+        <p class="text-muted">加载中...</p>
+    </div>
+</div>
+<script>
+function toggleSearch() {
+    const input = document.getElementById('filterSearchInput');
+    const btn = document.getElementById('searchToggleBtn');
+    input.classList.add('active');
+    input.focus();
+    btn.style.display = 'none';
+}
+document.getElementById('filterSearchInput')?.addEventListener('blur', function() {
+    if (!this.value) {
+        this.classList.remove('active');
+        document.getElementById('searchToggleBtn').style.display = '';
+    }
+});
+(function() {
+    const input = document.getElementById('filterSearchInput');
+    if (input && input.value) {
+        input.classList.add('active');
+        document.getElementById('searchToggleBtn').style.display = 'none';
+    }
+})();
+
+// ── 留言 ──
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function renderMessages(data) {
+    return data.map(m => {
+        let html = `<div class="message-item">
+            <div class="message-header">
+                <span class="message-author">${escapeHtml(m.author)}</span>
+                <span class="message-date">${m.created_at}</span>
+            </div>
+            <div class="message-body">${escapeHtml(m.content)}</div>
+            <button class="msg-reply-btn" onclick="showReplyForm(${m.id},'${escapeHtml(m.author)}')">回复</button>`;
+        if (m.replies && m.replies.length) {
+            html += '<div class="message-replies">';
+            m.replies.forEach(r => {
+                html += `<div class="message-item message-reply">
+                    <div class="message-header">
+                        <span class="message-author">${escapeHtml(r.author)}</span>
+                        <span class="message-date">${r.created_at}</span>
+                    </div>
+                    <div class="message-body">${escapeHtml(r.content)}</div>
+                </div>`;
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+        return html;
+    }).join('');
+}
+
+async function loadMessages() {
+    const el = document.getElementById('messages-list');
+    try {
+        const res = await fetch('/api/messages');
+        const data = await res.json();
+        if (!data.length) { el.innerHTML = '<p class="text-muted">暂无留言，快来留言吧</p>'; return; }
+        el.innerHTML = renderMessages(data);
+    } catch(e) { el.innerHTML = '<p class="text-muted">加载留言失败</p>'; }
+}
+
+function showReplyForm(msgId, author) {
+    document.getElementById('msg_parent_id').value = msgId;
+    const replyTo = document.getElementById('msg_reply_to');
+    replyTo.style.display = 'flex';
+    replyTo.querySelector('.msg-reply-target').textContent = '回复 ' + author;
+    document.getElementById('msgForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('msg_content').focus();
+}
+
+function cancelReply() {
+    document.getElementById('msg_parent_id').value = '';
+    document.getElementById('msg_reply_to').style.display = 'none';
+}
+
+document.getElementById('msgForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const content = document.getElementById('msg_content').value.trim();
+    if (!content) return alert('请输入留言内容');
+    const body = {
+        author: document.getElementById('msg_author').value.trim() || '匿名',
+        content: content,
+    };
+    const parentId = document.getElementById('msg_parent_id').value;
+    if (parentId) body.parent_id = parseInt(parentId);
+    const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    });
+    if (res.ok) {
+        alert('留言成功');
+        document.getElementById('msg_content').value = '';
+        cancelReply();
+        loadMessages();
+    } else {
+        const data = await res.json();
+        alert(data.detail || '提交失败');
+    }
+});
+
+loadMessages();
+</script>
+{% endblock %}

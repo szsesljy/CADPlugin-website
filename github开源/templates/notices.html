@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}公告 - CAD 插件平台{% endblock %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<div class="container container-narrow">
+    <a href="/" class="back-link">&larr; 返回首页</a>
+    <div class="notice-tabs">
+        <a href="/notices?type=notice" class="notice-tab {% if current_type == 'notice' %}active{% endif %}">通知</a>
+        <a href="/notices?type=guide" class="notice-tab {% if current_type == 'guide' %}active{% endif %}">使用说明</a>
+    </div>
+
+    {% if articles %}
+    <div class="article-list">
+        {% for a in articles %}
+        <a href="/notice/{{ a.id }}" class="article-card">
+            <div class="article-meta-top">
+                <span class="article-date">{{ a.created_at[:10] }}</span>
+                {% if a.pinned %}<span class="article-pinned">置顶</span>{% endif %}
+                {% if a.plugin_name %}
+                <span class="article-plugin-tag">插件：{{ a.plugin_name }}</span>
+                {% endif %}
+            </div>
+            <h2 class="article-title">{{ a.title }}</h2>
+            <p class="article-excerpt">{{ a.excerpt }}{% if a.excerpt|length >= 200 %}...{% endif %}</p>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        <p>暂无内容</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

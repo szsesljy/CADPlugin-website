@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} - CAD 插件平台{% endblock %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<div class="container container-narrow">
+    <a href="/notices?type={{ article.type }}" class="back-link">&larr; 返回公告</a>
+
+    <article class="article-reader">
+        <div class="article-reader-header">
+            <div class="article-reader-meta">
+                <span class="article-reader-type">
+                    {% if article.type == 'notice' %}通知{% else %}使用说明{% endif %}
+                </span>
+                <span class="article-reader-date">{{ article.created_at[:10] }}</span>
+                {% if article.plugin_name %}
+                <span class="article-reader-plugin">插件：{{ article.plugin_name }}</span>
+                {% endif %}
+            </div>
+            <h1 class="article-reader-title">{{ article.title }}</h1>
+        </div>
+        <div class="article-reader-body markdown-body" id="articleBody">{{ article.content }}</div>
+    </article>
+</div>
+<script>document.getElementById('articleBody').innerHTML = marked.parse(document.getElementById('articleBody').textContent)</script>
+
+    <!-- 留言区 -->
+    <div class="messages-section">
+        <h2 class="messages-title">留言</h2>
+        <p class="messages-hint">欢迎留言</p>
+
+        <div class="messages-form">
+            <form id="msgForm">
+                <input type="hidden" id="msg_article_id" value="{{ article.id }}">
+                <input type="hidden" id="msg_parent_id" value="">
+                <div id="msg_reply_to" class="msg-reply-indicator" style="display:none;">
+                    <span class="msg-reply-target"></span>
+                    <button type="button" class="msg-reply-cancel" onclick="cancelReply()">取消回复</button>
+                </div>
+                <div class="form-group">
+                    <input class="form-input" id="msg_author" placeholder="你的昵称（选填）" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <textarea class="form-input form-textarea" id="msg_content" rows="3" placeholder="写下你的想法..." maxlength="1000" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">提交留言</button>
+            </form>
+        </div>
+
+        <div id="messages-list" class="messages-list">
+            <p class="text-muted">加载中...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function renderMessages(data, articleId) {
+    return data.map(m => {
+        let html = `<div class="message-item">
+            <div class="message-header">
+                <span class="message-author">${escapeHtml(m.author)}</span>
+                <span class="message-date">${m.created_at}</span>
+            </div>
+            <div class="message-body">${escapeHtml(m.content)}</div>
+            <button class="msg-reply-btn" onclick="showReplyForm(${m.id},'${escapeHtml(m.author)}')">回复</button>`;
+        if (m.replies && m.replies.length) {
+            html += '<div class="message-replies">';
+            m.replies.forEach(r => {
+                html += `<div class="message-item message-reply">
+                    <div class="message-header">
+                        <span class="message-author">${escapeHtml(r.author)}</span>
+                        <span class="message-date">${r.created_at}</span>
+                    </div>
+                    <div class="message-body">${escapeHtml(r.content)}</div>
+                </div>`;
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+        return html;
+    }).join('');
+}
+
+async function loadMessages() {
+    const el = document.getElementById('messages-list');
+    try {
+        const res = await fetch(`/api/messages?article_id={{ article.id }}`);
+        const data = await res.json();
+        if (!data.length) { el.innerHTML = '<p class="text-muted">暂无留言，快来留言吧</p>'; return; }
+        el.innerHTML = renderMessages(data);
+    } catch(e) { el.innerHTML = '<p class="text-muted">加载留言失败</p>'; }
+}
+
+function showReplyForm(msgId, author) {
+    document.getElementById('msg_parent_id').value = msgId;
+    const replyTo = document.getElementById('msg_reply_to');
+    replyTo.style.display = 'flex';
+    replyTo.querySelector('.msg-reply-target').textContent = '回复 ' + author;
+    document.getElementById('msgForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('msg_content').focus();
+}
+
+function cancelReply() {
+    document.getElementById('msg_parent_id').value = '';
+    document.getElementById('msg_reply_to').style.display = 'none';
+}
+
+document.getElementById('msgForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const content = document.getElementById('msg_content').value.trim();
+    if (!content) return alert('请输入留言内容');
+    const body = {
+        article_id: parseInt(document.getElementById('msg_article_id').value),
+        author: document.getElementById('msg_author').value.trim() || '匿名',
+        content: content,
+    };
+    const parentId = document.getElementById('msg_parent_id').value;
+    if (parentId) body.parent_id = parseInt(parentId);
+    const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    });
+    if (res.ok) {
+        alert('留言成功');
+        document.getElementById('msg_content').value = '';
+        cancelReply();
+        loadMessages();
+    } else {
+        const data = await res.json();
+        alert(data.detail || '提交失败');
+    }
+});
+
+loadMessages();
+</script>
+{% endblock %}

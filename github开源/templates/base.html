@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CAD 插件平台{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <img src="/static/logo.svg" alt="CAD 插件平台" class="nav-logo-img">
+            </a>
+
+            <div class="nav-links">
+                <a href="/notices" class="nav-btn">公告</a>
+                <a href="/upload" class="nav-btn">上传插件</a>
+                {% if donation and donation.enabled %}
+                <button class="nav-btn nav-btn-donate" onclick="openDonate()">打赏</button>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 底部 -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <p class="footer-tagline">CAD 插件分享平台</p>
+            <p class="footer-disclaimer">免责声明：本站插件仅供学习交流，请勿用于商业用途。如有侵权，请联系删除。</p>
+        </div>
+    </footer>
+
+    <!-- 打赏弹窗 -->
+    <div class="modal-overlay" id="donateModal" onclick="closeDonate(event)">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeDonate()">&times;</button>
+            <h2 class="modal-title">{{ donation.title if donation else '支持开发者' }}</h2>
+            <div class="modal-qrcode">
+                <img src="/donation/qrcode" alt="收款码">
+            </div>
+            <p class="modal-hint">扫码打赏，支持插件开发</p>
+        </div>
+    </div>
+
+    <script>
+        function openDonate() { document.getElementById('donateModal').classList.add('active'); }
+        function closeDonate(e) { if (!e || e.target === e.currentTarget) document.getElementById('donateModal').classList.remove('active'); }
+    </script>
+</body>
+</html>
