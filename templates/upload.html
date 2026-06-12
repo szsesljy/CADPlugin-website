@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}上传插件{% endblock %}
+{% block content %}
+<div class="container container-narrow">
+    <h1 class="page-title">上传插件</h1>
+    <p class="page-desc">支持 .lsp .dll .fas .vlx .cs .arx .crx 等格式，最大 100MB</p>
+
+    {% if success %}
+    <div class="alert alert-success">上传成功！等待管理员审核。</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form class="upload-form" method="post" action="/upload" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label" for="name">插件名称 <span class="required">*</span></label>
+            <input class="form-input" type="text" id="name" name="name" required placeholder="输入插件名称">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="description">描述</label>
+            <textarea class="form-input form-textarea" id="description" name="description" rows="3" placeholder="简要描述插件功能（支持 Markdown）"></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="version">版本</label>
+                <input class="form-input" type="text" id="version" name="version" value="1.0">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="author">作者</label>
+                <input class="form-input" type="text" id="author" name="author" value="匿名" placeholder="可选">
+            </div>
+        </div>
+
+        <!-- 分类选择 -->
+        {% if categories %}
+        <div class="form-group">
+            <label class="form-label">行业用途（可多选）</label>
+            <div class="category-picker">
+                {% for cat in categories %}
+                <div class="cat-group">
+                    <div class="cat-group-title">{{ cat.name }}</div>
+                    <div class="cat-tags">
+                        {% for t in cat.tags %}
+                        <label class="cat-tag">
+                            <input type="checkbox" name="tag_ids" value="{{ t.id }}">
+                            <span>{{ t.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label class="form-label" for="file">选择文件 <span class="required">*</span></label>
+            <input class="form-file" type="file" id="file" name="file" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">网盘下载链接（可选）</label>
+            <input class="form-input" type="url" id="netdisk_url" name="netdisk_url" placeholder="百度网盘 / 蓝奏云 等分享链接">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">下载方式</label>
+            <select class="form-input" id="download_mode" name="download_mode">
+                <option value="direct_only">仅直接下载</option>
+                <option value="both">直接下载 + 网盘下载</option>
+                <option value="netdisk_only">仅网盘下载</option>
+            </select>
+        </div>
+
+        <button class="btn btn-primary btn-full" type="submit">提交上传</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CAD 插件平台{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css?v=2">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .markdown-body { line-height:1.7; color:#334155; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin:1em 0 .5em; color:#1e293b; }
+        .markdown-body h1 { font-size:1.4em; border-bottom:1px solid #e2e8f0; padding-bottom:.3em; }
+        .markdown-body h2 { font-size:1.2em; }
+        .markdown-body h3 { font-size:1.1em; }
+        .markdown-body p { margin:.5em 0; }
+        .markdown-body ul, .markdown-body ol { padding-left:1.5em; margin:.5em 0; }
+        .markdown-body li { margin:.25em 0; }
+        .markdown-body code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:.9em; }
+        .markdown-body pre { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; overflow-x:auto; }
+        .markdown-body pre code { background:none; padding:0; }
+        .markdown-body blockquote { border-left:4px solid #2563eb; padding-left:12px; color:#64748b; margin:.5em 0; }
+        .markdown-body a { color:#2563eb; text-decoration:underline; }
+        .markdown-body img { max-width:100%; border-radius:8px; margin:.5em 0; }
+        .markdown-body table { border-collapse:collapse; width:100%; margin:.5em 0; }
+        .markdown-body th, .markdown-body td { border:1px solid #e2e8f0; padding:8px 12px; text-align:left; }
+        .markdown-body th { background:#f8fafc; }
+        .markdown-body hr { border:none; border-top:2px solid #e2e8f0; margin:1.5em 0; }
+        .markdown-editor-hint { font-size:12px; color:#94a3b8; margin-top:4px; }
+        .markdown-editor-hint code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:11px; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <img src="/static/logo.svg" alt="CAD 插件平台" class="nav-logo-img">
+            </a>
+
+            <div class="nav-sections">
+                <a href="/" class="nav-section {% if request.url.path == '/' %}active{% endif %}">插件</a>
+                {% for b in boards %}
+                <a href="/board/{{ b.slug }}" class="nav-section {% if request.url.path == '/board/' + b.slug or request.url.path.startswith('/board/' + b.slug + '/') %}active{% endif %}">{{ b.name }}</a>
+                {% endfor %}
+            </div>
+
+            <div class="nav-links">
+                <a href="/notices" class="nav-btn">公告</a>
+                <a href="/upload" class="nav-btn">上传插件</a>
+                {% if donation and donation.enabled %}
+                <button class="nav-btn nav-btn-donate" onclick="openDonate()">打赏</button>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 底部 -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <p class="footer-tagline">资深土木工程师亲测好用</p>
+            <p class="footer-disclaimer">免责声明：本站插件仅供学习交流，请勿用于商业用途。如有侵权，请联系删除。</p>
+        </div>
+    </footer>
+
+    <!-- 打赏弹窗 -->
+    <div class="modal-overlay" id="donateModal" onclick="closeDonate(event)">
+        <div class="modal-box">
+            <button class="modal-close" onclick="closeDonate()">&times;</button>
+            <h2 class="modal-title">{{ donation.title if donation else '支持开发者' }}</h2>
+            <div class="modal-qrcode">
+                <img src="/donation/qrcode" alt="收款码">
+            </div>
+            <p class="modal-hint">扫码打赏，支持插件开发</p>
+        </div>
+    </div>
+
+    <script>
+        function openDonate() { document.getElementById('donateModal').classList.add('active'); }
+        function closeDonate(e) { if (!e || e.target === e.currentTarget) document.getElementById('donateModal').classList.remove('active'); }
+    </script>
+</body>
+</html>

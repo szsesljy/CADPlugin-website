@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 120" fill="none">
+  <!-- 两个叠加的六边形（模块/积木） -->
+  <polygon points="30,15 55,28 55,52 30,65 5,52 5,28"
+           fill="#2563eb" opacity="0.15"/>
+  <polygon points="40,20 62,31 62,51 40,62 18,51 18,31"
+           fill="#2563eb" opacity="0.3"/>
+  <polygon points="47,23 65,32 65,48 47,57 29,48 29,32"
+           fill="#2563eb" opacity="0.95"/>
+
+  <!-- 文字：CAD 插件 -->
+  <text x="90" y="52" font-family="system-ui, -apple-system, sans-serif"
+        font-size="32" font-weight="800" fill="#1e293b" letter-spacing="1">CAD 插件</text>
+  <text x="90" y="80" font-family="system-ui, -apple-system, sans-serif"
+        font-size="14" font-weight="400" fill="#94a3b8" letter-spacing="2">PLUGIN PLATFORM</text>
+
+  <!-- 装饰小点 -->
+  <circle cx="85" cy="95" r="3" fill="#2563eb" opacity="0.15"/>
+  <circle cx="98" cy="95" r="3" fill="#2563eb" opacity="0.15"/>
+  <circle cx="111" cy="95" r="3" fill="#2563eb" opacity="0.15"/>
+</svg>

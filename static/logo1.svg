@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- 齿轮主体 -->
+  <defs>
+    <clipPath id="clip1">
+      <rect x="0" y="0" width="60" height="60"/>
+    </clipPath>
+  </defs>
+  <g transform="translate(60,60)">
+    <!-- 齿轮外圈 -->
+    <path d="M0 -40 L7 -38 L10 -44 L18 -38 L22 -42 L28 -33 L36 -35 L36 -27 L44 -25 L42 -18
+             L48 -14 L44 -6 L48 0 L44 6 L48 14 L42 18 L44 25 L36 27 L36 35 L28 33
+             L22 42 L18 38 L10 44 L7 38 L0 40 L-7 38 L-10 44 L-18 38 L-22 42
+             L-28 33 L-36 35 L-36 27 L-44 25 L-42 18 L-48 14 L-44 6 L-48 0
+             L-44 -6 L-48 -14 L-42 -18 L-44 -25 L-36 -27 L-36 -35 L-28 -33
+             L-22 -42 L-18 -38 L-10 -44 L-7 -38 Z"
+          fill="#2563eb" opacity="0.15"/>
+    <!-- 齿轮内圈 -->
+    <circle cx="0" cy="0" r="24" fill="#2563eb" opacity="0.08"/>
+    <circle cx="0" cy="0" r="16" fill="#2563eb" opacity="0.95"/>
+    <!-- 拼图缺口（右侧） -->
+    <path d="M14 -4 Q14 -10 20 -10 Q26 -10 26 -4 Q26 2 20 2 Q14 2 14 -4Z"
+          fill="#fff"/>
+    <circle cx="0" cy="0" r="6" fill="#fff" opacity="0.3"/>
+  </g>
+</svg>

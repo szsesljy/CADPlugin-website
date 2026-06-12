@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- 六边形底座 -->
+  <polygon points="60,5 107,32 107,88 60,115 13,88 13,32"
+           fill="#2563eb" opacity="0.08"/>
+  <polygon points="60,18 97,39 97,81 60,102 23,81 23,39"
+           fill="#2563eb" opacity="0.12"/>
+
+  <!-- 向下箭头（下载） -->
+  <path d="M60 32 L60 80 M44 64 L60 80 L76 64"
+        stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 底部横线 -->
+  <line x1="32" y1="88" x2="88" y2="88"
+        stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>
+</svg>

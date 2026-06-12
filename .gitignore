@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 项目数据（SQLite 数据库、日志、上传文件）
+data/
+logs/
+storage/
+
+# 会话 Cookie（本地测试遗留）
+cookie*.txt
+ookies
+
+# 构建产物
+*.tar.gz
+*.zip
+!plugins_bundle/*.zip
+
+# Claude 个人配置
+.claude/
+
+# 环境变量
+.env
+
+# 部署脚本（含服务器 IP 等敏感信息）
+deploy.sh
+deploy_update.bat
+deploy.bat
+deploy_windows.bat
+package.sh
+start.bat
+
+# Nginx 配置（含域名、证书路径）
+config/
+
+# 部署文档
+DEPLOY.md
+PLAN.md
+IMPROVEMENTS.md
+
+# 插件备份包
+plugins_bundle/
+plugins_bundle.tar.gz

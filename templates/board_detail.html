@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} - {{ board.name }}{% endblock %}
+{% block content %}
+<div class="container container-narrow">
+    <a href="/board/{{ board.slug }}" class="back-link">&larr; 返回{{ board.name }}列表</a>
+
+    <div class="detail-card">
+        <div class="detail-header">
+            <h1 class="detail-title">{{ item.title }}</h1>
+        </div>
+
+        {% if item.file_name %}
+        <div class="detail-info">
+            <div class="detail-info-item">
+                <span class="detail-info-label">文件名称</span>
+                <span>{{ item.file_name }}</span>
+            </div>
+            <div class="detail-info-item">
+                <span class="detail-info-label">上传时间</span>
+                <span>{{ item.created_at[:10] }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if item.file_url %}
+        <div class="detail-downloads" style="margin-top:24px;">
+            <a href="{{ item.file_url }}" target="_blank" class="btn btn-netdisk btn-download" rel="noopener noreferrer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                {{ item.file_name or '网盘下载' }}
+            </a>
+        </div>
+        {% else %}
+        <p class="text-muted" style="margin-top:20px;text-align:center;">暂无下载文件</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

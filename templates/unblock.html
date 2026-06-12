@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}申请解封 - CAD 插件平台{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px;margin:40px auto;">
+    <h2 style="margin-bottom:8px;">申请解封</h2>
+    <p class="text-muted" style="margin-bottom:24px;">您的 IP 已被封禁，如有异议请填写以下表单申请解封。</p>
+
+    <form id="unblockForm" class="upload-form">
+        <div class="form-group">
+            <input class="form-input" type="text" id="ub_reason" placeholder="请说明解封理由（必填）" required>
+        </div>
+        <button class="btn btn-primary" type="submit">提交申请</button>
+    </form>
+
+    <div id="ub_result" style="margin-top:16px;display:none;"></div>
+</div>
+
+<script>
+document.getElementById('unblockForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const reason = document.getElementById('ub_reason').value.trim();
+    if (!reason) return alert('请输入解封理由');
+
+    const btn = this.querySelector('button');
+    btn.disabled = true;
+    btn.textContent = '提交中...';
+
+    try {
+        const res = await fetch('/unblock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason}),
+        });
+        const data = await res.json();
+        document.getElementById('ub_result').style.display = 'block';
+        document.getElementById('ub_result').className = res.ok ? 'text-success' : 'text-danger';
+        document.getElementById('ub_result').textContent = data.message || (res.ok ? '申请已提交，请等待管理员审核。' : '提交失败');
+        if (res.ok) document.getElementById('unblockForm').reset();
+    } catch(e) {
+        document.getElementById('ub_result').style.display = 'block';
+        document.getElementById('ub_result').className = 'text-danger';
+        document.getElementById('ub_result').textContent = '网络错误，请重试';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '提交申请';
+});
+</script>
+{% endblock %}
