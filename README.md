@@ -55,6 +55,8 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 ├── models.py               # Pydantic 模型
 ├── security.py             # ClamAV 病毒扫描
 ├── dependencies.py         # 模板注入、统计等依赖
+├── import_plugins.py       # 批量导入插件工具
+├── deploy*.bat / deploy.sh / package.sh / start.bat   # 部署打包脚本
 ├── routers/
 │   ├── admin.py            # 后台管理 API
 │   ├── download.py         # 前台页面 + 公开 API
@@ -66,8 +68,16 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 │   ├── admin.html          # 管理后台
 │   └── ...
 ├── static/                 # 静态文件（CSS / 图片）
+├── storage/                # 插件文件存储（pending / approved / donation）
+├── scripts/                # 工具脚本（插件打包 prepare_plugins.py、功能验证 verify_admin_download_list.py）
+├── docs/                   # 文档（DEPLOY 部署、PLAN 计划、更新日志、使用方法、需求记录等）
+├── archives/               # 构建产物与备份包（zip / tar.gz，git 忽略）
 └── requirements.txt        # Python 依赖
 ```
+
+> 注：`deploy.bat`、`deploy_update.bat`、`deploy.sh`、`package.sh`、`start.bat`
+> 与 `import_plugins.py` 必须留在根目录 —— 打包脚本依赖它们在项目根运行，
+> `deploy.sh` 在服务器端要求与 `main.py` 同目录，移动会导致部署失败。
 
 ## 截图
 

@@ -40,6 +40,10 @@
                 <span>{{ plugin.downloads }}</span>
             </div>
             <div class="detail-info-item">
+                <span class="detail-info-label">浏览次数</span>
+                <span>{{ plugin.view_count or 0 }}</span>
+            </div>
+            <div class="detail-info-item">
                 <span class="detail-info-label">文件类型</span>
                 <span>{{ plugin.file_name.split('.')[-1]|upper }}</span>
             </div>
@@ -58,7 +62,7 @@
             <a href="/download/{{ plugin.id }}" class="btn btn-primary btn-download">普通下载</a>
             {% endif %}
             {% if plugin.netdisk_url and plugin.download_mode != 'direct_only' %}
-            <a href="{{ plugin.netdisk_url }}" target="_blank" class="btn btn-netdisk btn-download" rel="noopener noreferrer">网盘下载</a>
+            <a href="/track-netdisk/{{ plugin.id }}" target="_blank" class="btn btn-netdisk btn-download" rel="noopener noreferrer">网盘下载</a>
             {% endif %}
         </div>
     </div>
@@ -82,6 +86,11 @@
                 <div class="form-group">
                     <textarea class="form-input form-textarea" id="msg_content" rows="3" placeholder="写下你的使用感受或问题...（支持 Markdown）" maxlength="1000" required></textarea>
                 </div>
+                <div class="form-group" style="display:flex;gap:8px;align-items:center;">
+                    <input class="form-input" id="msg_captcha" placeholder="验证码" maxlength="6" autocomplete="off" style="max-width:130px;" required>
+                    <img id="msg_captcha_img" src="/api/captcha" alt="验证码" title="看不清？点击图片刷新" style="height:40px;border-radius:6px;cursor:pointer;border:1px solid #cbd5e1;" onclick="refreshCaptcha()">
+                    <button type="button" class="btn btn-sm" onclick="refreshCaptcha()">换一张</button>
+                </div>
                 <button type="submit" class="btn btn-primary">提交留言</button>
             </form>
         </div>
@@ -93,15 +102,28 @@
 </div>
 
 <script>
+function refreshCaptcha() {
+    const img = document.getElementById('msg_captcha_img');
+    img.src = '/api/captcha?t=' + Date.now();
+    document.getElementById('msg_captcha').value = '';
+}
 function escapeHtml(s) {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
 }
 
+function locLink(m) {
+    if (!m.location) return '';
+    let loc = escapeHtml(m.location);
+    if (m.plugin_id) return ` ▸<a href="/plugin/${m.plugin_id}" class="msg-loc-link">${loc}</a>`;
+    if (m.article_id) return ` ▸<a href="/notice/${m.article_id}" class="msg-loc-link">${loc}</a>`;
+    return ` ▸<a href="https://cadchajian.com" class="msg-loc-link">${loc}</a>`;
+}
+
 function renderMessages(data, pluginId) {
     return data.map(m => {
-        let location = m.location ? ` → ${escapeHtml(m.location)}` : '';
+        let location = locLink(m);
     let html = `<div class="message-item">
             <div class="message-header">
                 <span class="message-author">${escapeHtml(m.author)}</span><span class="message-location">${location}</span>
@@ -112,7 +134,7 @@ function renderMessages(data, pluginId) {
         if (m.replies && m.replies.length) {
             html += '<div class="message-replies">';
             m.replies.forEach(r => {
-                let rloc = r.location ? ` → ${escapeHtml(r.location)}` : '';
+                let rloc = locLink(r);
                 html += `<div class="message-item message-reply">
                     <div class="message-header">
                         <span class="message-author">${escapeHtml(r.author)}</span><span class="message-location">${rloc}</span>
@@ -161,6 +183,7 @@ document.getElementById('msgForm')?.addEventListener('submit', async function(e)
         plugin_id: parseInt(document.getElementById('msg_plugin_id').value),
         author: document.getElementById('msg_author').value.trim() || '匿名',
         content: content,
+        captcha: document.getElementById('msg_captcha').value.trim(),
     };
     const parentId = document.getElementById('msg_parent_id').value;
     if (parentId) body.parent_id = parseInt(parentId);
@@ -170,13 +193,15 @@ document.getElementById('msgForm')?.addEventListener('submit', async function(e)
         body: JSON.stringify(body),
     });
     if (res.ok) {
-        alert('留言成功');
+        const data = await res.json();
+        alert(data.message || '留言成功');
         document.getElementById('msg_content').value = '';
         cancelReply();
         loadMessages();
     } else {
         const data = await res.json();
         alert(data.detail || '提交失败');
+        refreshCaptcha();
     }
 });
 

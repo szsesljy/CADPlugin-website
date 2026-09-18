@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>折线图预览 - 悬浮提示（含下载 IP 明细）</title>
+<style>
+body { font-family: system-ui, sans-serif; background: #f6f8fc; padding: 40px; }
+.chart-card {
+    background: #fff; border-radius: 16px; padding: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    max-width: 720px; margin: 0 auto 24px;
+}
+.canvas-wrap { position: relative; }
+canvas { width: 100% !important; display: block; cursor: crosshair; }
+.desc { font-size: 14px; color: #64748b; margin-top: 12px; text-align: center; }
+.card-title { font-size: 15px; font-weight: 600; color: #1e293b; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+
+<div class="chart-card">
+    <p class="card-title">页面访问（近7天）</p>
+    <div class="canvas-wrap">
+        <canvas id="pvChart" height="220"></canvas>
+    </div>
+    <p class="desc">鼠标悬停在折线上查看每日数据</p>
+</div>
+
+<div class="chart-card">
+    <p class="card-title">下载量（近7天，悬停查看每日 IP 明细）</p>
+    <div class="canvas-wrap">
+        <canvas id="downloadChart" height="260"></canvas>
+    </div>
+    <p class="desc">悬浮提示显示当日下载量及所有下载 IP（格式：IP 地址 : 下载量）</p>
+</div>
+
+<script>
+function drawMultiLineChart(canvasId, series, opts) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !series || series.length < 1) return;
+    for (const s of series) {
+        if (!s.data || s.data.length < 2) return;
+    }
+
+    const chartHeight = (opts && opts.height) || 220;
+    const showIpDetail = !!(opts && opts.ipDetail);
+
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 2;
+    const W = canvas.width = Math.max(rect.width || 680, 600) * dpr;
+    const H = canvas.height = chartHeight * dpr;
+    canvas.style.height = chartHeight + 'px';
+    const ctx = canvas.getContext('2d');
+    const pad = { top: 32, right: 24, bottom: 48, left: 60 };
+    const w = W - pad.left - pad.right;
+    const h = H - pad.top - pad.bottom;
+
+    let allValues = [];
+    const labels = series[0].data.map(d => (d.date || '').slice(5));
+    const fullDates = series[0].data.map(d => d.date || '');
+    for (const s of series) {
+        allValues = allValues.concat(s.data.map(d => d.count || 0));
+    }
+    const max = Math.max(...allValues, 1);
+    const xStep = w / Math.max(labels.length - 1, 1);
+
+    const seriesPoints = series.map(s => ({
+        label: s.label,
+        color: s.color,
+        points: s.data.map((d, i) => ({
+            x: pad.left + i * xStep,
+            y: pad.top + h - ((d.count || 0) / max) * h,
+            v: d.count || 0,
+        })),
+    }));
+
+    let hoverIndex = -1;
+
+    function render() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Grid
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = pad.top + (h / 4) * i;
+            ctx.beginPath(); ctx.moveTo(pad.left / dpr, y / dpr); ctx.lineTo((pad.left + w) / dpr, y / dpr);
+            ctx.stroke();
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(Math.round(max - (max / 4) * i), (pad.left - 8) / dpr, y / dpr + 4);
+        }
+
+        // X labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        seriesPoints[0].points.forEach(p => {
+            ctx.fillText(labels[seriesPoints[0].points.indexOf(p)], p.x / dpr, (pad.top + h + 20) / dpr);
+        });
+
+        // Draw each series
+        for (const sp of seriesPoints) {
+            if (seriesPoints.indexOf(sp) === 0) {
+                ctx.beginPath();
+                ctx.moveTo(sp.points[0].x / dpr, (pad.top + h) / dpr);
+                sp.points.forEach(p => ctx.lineTo(p.x / dpr, p.y / dpr));
+                ctx.lineTo(sp.points[sp.points.length - 1].x / dpr, (pad.top + h) / dpr);
+                ctx.closePath();
+                const grad = ctx.createLinearGradient(0, pad.top / dpr, 0, (pad.top + h) / dpr);
+                grad.addColorStop(0, sp.color + '20');
+                grad.addColorStop(1, sp.color + '05');
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
+
+            ctx.beginPath();
+            sp.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x / dpr, p.y / dpr) : ctx.lineTo(p.x / dpr, p.y / dpr));
+            ctx.strokeStyle = sp.color;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            sp.points.forEach(p => {
+                const isHover = seriesPoints.indexOf(sp) === 0 && seriesPoints[0].points.indexOf(p) === hoverIndex;
+                ctx.beginPath();
+                ctx.arc(p.x / dpr, p.y / dpr, 4.5, 0, Math.PI * 2);
+                ctx.fillStyle = isHover ? sp.color : '#fff';
+                ctx.fill();
+                ctx.strokeStyle = sp.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        // Hover indicator
+        if (hoverIndex >= 0 && hoverIndex < seriesPoints[0].points.length) {
+            const hp = seriesPoints[0].points[hoverIndex];
+            // Vertical line
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4 / dpr, 4 / dpr]);
+            ctx.beginPath();
+            ctx.moveTo(hp.x / dpr, pad.top / dpr);
+            ctx.lineTo(hp.x / dpr, (pad.top + h) / dpr);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Tooltip（每行按实际渲染字体测量宽度，白框自适应文字长度）
+            let tooltipLines = [];
+            let maxTextW = 0;
+            const measureLine = (txt, bold) => {
+                ctx.font = bold ? '13px system-ui, sans-serif' : '12px system-ui, sans-serif';
+                const w = ctx.measureText(txt).width;
+                if (w > maxTextW) maxTextW = w;
+            };
+            const dateLabel = fullDates[hoverIndex];
+            tooltipLines.push({ text: dateLabel, color: '#0f172a', bold: true });
+            measureLine(dateLabel, true);
+            for (const sp of seriesPoints) {
+                const val = sp.points[hoverIndex].v;
+                const txt = `${sp.label}: ${val}`;
+                tooltipLines.push({ text: txt, color: sp.color, bold: false });
+                measureLine(txt, false);
+            }
+
+            // 下载量图：显示当日各 IP 的下载量明细
+            const hoverDay = series[0].data[hoverIndex];
+            if (showIpDetail && hoverDay) {
+                if (Array.isArray(hoverDay.ips) && hoverDay.ips.length) {
+                    const MAX_IPS = 7;
+                    tooltipLines.push({ text: '下载 IP 明细', color: '#64748b', bold: true });
+                    measureLine('下载 IP 明细', true);
+                    for (const it of hoverDay.ips.slice(0, MAX_IPS)) {
+                        const t = `${it.ip} : ${it.count}`;
+                        tooltipLines.push({ text: t, color: '#334155', bold: false });
+                        measureLine(t, false);
+                    }
+                    if (hoverDay.ips.length > MAX_IPS) {
+                        const more = `…… 共 ${hoverDay.ips.length} 个 IP`;
+                        tooltipLines.push({ text: more, color: '#94a3b8', bold: false });
+                        measureLine(more, false);
+                    }
+                } else if (hoverDay.count > 0) {
+                    tooltipLines.push({ text: '（该日未记录下载 IP）', color: '#94a3b8', bold: false });
+                    measureLine('（该日未记录下载 IP）', false);
+                }
+            }
+
+            // tooltip 尺寸/坐标全部按物理像素计算，与文字测量、绘制保持一致（高分屏 dpr>1 时不会溢出）
+            const tooltipW = Math.max(maxTextW + 28 * dpr, 100 * dpr);
+            const lineH = 20 * dpr;
+            const tooltipH = tooltipLines.length * lineH + 12 * dpr;
+            let tx = hp.x + 14 * dpr;
+            let ty = hp.y - 10 * dpr;
+            if (tx + tooltipW > pad.left + w) tx = hp.x - tooltipW - 14 * dpr;
+            if (tx < 4 * dpr) tx = 4 * dpr;
+            if (ty < 4 * dpr) ty = 4 * dpr;
+            // 允许 tooltip 使用整个画布高度（下载明细较多时）
+            if (ty + tooltipH > H - 4 * dpr) ty = H - 4 * dpr - tooltipH;
+            if (ty < 4 * dpr) ty = 4 * dpr;
+
+            // Tooltip bg
+            ctx.fillStyle = 'rgba(255,255,255,0.96)';
+            ctx.shadowColor = 'rgba(0,0,0,0.10)';
+            ctx.shadowBlur = 12 * dpr;
+            ctx.shadowOffsetY = 2 * dpr;
+            ctx.beginPath();
+            ctx.roundRect(tx, ty, tooltipW, tooltipH, 8 * dpr);
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(tx, ty, tooltipW, tooltipH, 8 * dpr);
+            ctx.stroke();
+
+            // Tooltip text
+            let textY = ty + 18 * dpr;
+            for (const line of tooltipLines) {
+                ctx.fillStyle = line.color;
+                ctx.font = line.bold ? '13px system-ui, sans-serif' : '12px system-ui, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(line.text, tx + 12 * dpr, textY);
+                textY += lineH;
+            }
+        }
+    }
+
+    canvas.onmousemove = function(e) {
+        const rect2 = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect2.left) * dpr;
+        const my = (e.clientY - rect2.top) * dpr;
+
+        let nearest = -1;
+        let minDist = Infinity;
+        for (const sp of seriesPoints) {
+            for (const p of sp.points) {
+                const dx = mx - p.x;
+                const dy = my - p.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < minDist && dist < 60 * dpr) {
+                    minDist = dist;
+                    nearest = sp.points.indexOf(p);
+                }
+            }
+        }
+        if (nearest !== hoverIndex) {
+            hoverIndex = nearest;
+            render();
+        }
+    };
+
+    canvas.onmouseleave = function() {
+        if (hoverIndex !== -1) {
+            hoverIndex = -1;
+            render();
+        }
+    };
+
+    render();
+}
+
+const pvData = [
+    {date:'2026-07-30', count:237},
+    {date:'2026-07-31', count:239},
+    {date:'2026-08-01', count:178},
+    {date:'2026-08-02', count:168},
+    {date:'2026-08-03', count:124},
+    {date:'2026-08-04', count:86},
+    {date:'2026-08-05', count:3},
+];
+const uvData = [
+    {date:'2026-07-30', count:26},
+    {date:'2026-07-31', count:18},
+    {date:'2026-08-01', count:13},
+    {date:'2026-08-02', count:14},
+    {date:'2026-08-03', count:8},
+    {date:'2026-08-04', count:4},
+    {date:'2026-08-05', count:0},
+];
+const dlData = [
+    {date:'2026-07-30', count:42, ips:[
+        {ip:'103.45.67.8', count:6}, {ip:'222.188.12.34', count:5},
+        {ip:'183.2.4.9', count:5}, {ip:'223.104.5.3', count:4},
+        {ip:'117.136.45.12', count:3}, {ip:'114.244.2.1', count:2},
+        {ip:'61.140.7.90', count:2}, {ip:'180.101.49.8', count:2},
+    ]},
+    {date:'2026-07-31', count:38, ips:[
+        {ip:'222.188.12.34', count:7}, {ip:'103.45.67.8', count:6},
+        {ip:'183.2.4.9', count:4}, {ip:'223.104.5.3', count:3},
+    ]},
+    {date:'2026-08-01', count:25, ips:[
+        {ip:'114.244.2.1', count:4}, {ip:'117.136.45.12', count:3},
+    ]},
+    {date:'2026-08-02', count:19, ips:[
+        {ip:'61.140.7.90', count:3},
+    ]},
+    {date:'2026-08-03', count:12, ips:[]},
+    {date:'2026-08-04', count:8, ips:[
+        {ip:'223.104.5.3', count:2},
+    ]},
+    {date:'2026-08-05', count:1, ips:[
+        {ip:'127.0.0.1', count:1},
+    ]},
+];
+
+drawMultiLineChart('pvChart', [
+    { label: '页面访问 (PV)', data: pvData, color: '#2563eb' },
+    { label: '新增访客', data: uvData, color: '#7c3aed' },
+]);
+
+drawMultiLineChart('downloadChart', [
+    { label: '下载量', data: dlData, color: '#059669' },
+], { height: 260, ipDetail: true });
+</script>
+</body>
+</html>

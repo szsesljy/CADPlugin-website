@@ -30,7 +30,7 @@
         .markdown-editor-hint code { background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:11px; }
     </style>
 </head>
-<body>
+<body class="{% if is_mobile_site %}mobile-site{% endif %}">
     <!-- 导航栏 -->
     <nav class="nav">
         <div class="nav-inner">
@@ -38,6 +38,7 @@
                 <img src="/static/logo.svg" alt="CAD 插件平台" class="nav-logo-img">
             </a>
 
+            {% if not is_mobile_site %}
             <div class="nav-sections">
                 <a href="/" class="nav-section {% if request.url.path == '/' %}active{% endif %}">插件</a>
                 {% for b in boards %}
@@ -51,9 +52,62 @@
                 {% if donation and donation.enabled %}
                 <button class="nav-btn nav-btn-donate" onclick="openDonate()">打赏</button>
                 {% endif %}
+                <a href="https://phone.cadchajian.com" class="nav-btn nav-btn-device" title="切换到手机版">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span>手机版</span>
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- 汉堡菜单按钮 -->
+            <button class="hamburger" id="hamburgerBtn" aria-label="菜单" onclick="toggleDrawer()">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+
+        <!-- 导航抽屉 -->
+        <div class="nav-drawer" id="navDrawer">
+            <a href="/" class="nav-section {% if request.url.path == '/' %}active{% endif %}" onclick="closeDrawer()">插件</a>
+            {% for b in boards %}
+            <a href="/board/{{ b.slug }}" class="nav-section {% if request.url.path == '/board/' + b.slug or request.url.path.startswith('/board/' + b.slug + '/') %}active{% endif %}" onclick="closeDrawer()">{{ b.name }}</a>
+            {% endfor %}
+            <div class="nav-links">
+                <a href="/notices" class="nav-btn" onclick="closeDrawer()">公告</a>
+                <a href="/upload" class="nav-btn" onclick="closeDrawer()">上传插件</a>
+                {% if donation and donation.enabled %}
+                <button class="nav-btn nav-btn-donate" onclick="openDonate();closeDrawer()">打赏</button>
+                {% endif %}
+                {% if is_mobile_site %}
+                <a href="https://cadchajian.com" class="nav-btn nav-btn-device" onclick="closeDrawer()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <span>电脑版</span>
+                </a>
+                {% endif %}
             </div>
         </div>
     </nav>
+
+    <!-- 底部导航栏（手机版） -->
+    {% if is_mobile_site %}
+    <nav class="bottom-nav">
+        <a href="/" class="bottom-nav-item {% if request.url.path == '/' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="bottom-nav-label">首页</span>
+        </a>
+        <a href="/notices" class="bottom-nav-item {% if request.url.path == '/notices' or request.url.path.startswith('/notice/') %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="bottom-nav-label">公告</span>
+        </a>
+        <a href="/upload" class="bottom-nav-item {% if request.url.path == '/upload' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span class="bottom-nav-label">上传</span>
+        </a>
+        <button class="bottom-nav-item" onclick="openDonate()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="bottom-nav-label">打赏</span>
+        </button>
+    </nav>
+    {% endif %}
 
     <main class="main">
         {% block content %}{% endblock %}
@@ -64,7 +118,7 @@
         <div class="footer-inner">
             <p class="footer-tagline">资深土木工程师亲测好用</p>
             <p class="footer-disclaimer">免责声明：本站插件仅供学习交流，请勿用于商业用途。如有侵权，请联系删除。</p>
-            <p class="footer-oss"><a href="https://github.com/szsesljy/CADPlugin-website" target="_blank" rel="noopener">开放源代码</a></p>
+            <p class="footer-oss"><a href="https://github.com/szsesljy/CADPlugin-website" target="_blank" rel="noopener">本网站已开源</a>，欢迎 Star ｜ 联系邮箱：<a href="mailto:cadchajian@126.com">cadchajian@126.com</a></p>
         </div>
     </footer>
 
@@ -81,6 +135,26 @@
     </div>
 
     <script>
+        // 汉堡菜单切换
+        function toggleDrawer() {
+            const btn = document.getElementById('hamburgerBtn');
+            const drawer = document.getElementById('navDrawer');
+            btn.classList.toggle('active');
+            drawer.classList.toggle('open');
+        }
+        function closeDrawer() {
+            document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('navDrawer').classList.remove('open');
+        }
+        // 点击页面其他区域关闭抽屉
+        document.addEventListener('click', function(e) {
+            const drawer = document.getElementById('navDrawer');
+            const btn = document.getElementById('hamburgerBtn');
+            if (drawer.classList.contains('open') && !drawer.contains(e.target) && !btn.contains(e.target)) {
+                closeDrawer();
+            }
+        });
+
         function openDonate() { document.getElementById('donateModal').classList.add('active'); }
         function closeDonate(e) { if (!e || e.target === e.currentTarget) document.getElementById('donateModal').classList.remove('active'); }
     </script>

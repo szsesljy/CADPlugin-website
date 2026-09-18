@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理后台 - CAD 插件平台</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
     <nav class="nav">
@@ -23,19 +23,86 @@
 
     <main class="main">
         <div class="container">
-            <!-- 统计卡片：插件数据 -->
-            <div class="stats-row">
-                <div class="stat-card stat-card-plugin"><span class="stat-num">{{ stats.total }}</span><span class="stat-label">总计</span></div>
-                <div class="stat-card stat-card-plugin"><span class="stat-num">{{ stats.approved }}</span><span class="stat-label">已审核</span></div>
-                <div class="stat-card stat-card-plugin"><span class="stat-num">{{ stats.pending }}</span><span class="stat-label">待审核</span></div>
-                <div class="stat-card stat-card-plugin"><span class="stat-num">{{ stats.downloads }}</span><span class="stat-label">总下载</span></div>
-            </div>
-            <!-- 统计卡片：访问数据 -->
-            <div class="stats-divider"></div>
-            <div class="stats-row">
-                <div class="stat-card stat-card-visit"><span class="stat-num">{{ views.total }}</span><span class="stat-label">总访问</span></div>
-                <div class="stat-card stat-card-visit"><span class="stat-num">{{ views.today }}</span><span class="stat-label">今日访问</span></div>
-                <div class="stat-card stat-card-visit"><span class="stat-num">{{ views.yesterday }}</span><span class="stat-label">昨日访问</span></div>
+            <!-- 可折叠统计区 -->
+            <div class="stats-collapse">
+                <div class="stats-collapse-item expanded" onclick="toggleStats(this)">
+                    <div class="stats-collapse-header">
+                        <span class="stats-collapse-icon">▼</span>
+                        <span class="stats-collapse-title">插件数据</span>
+                        <span class="stats-collapse-summary">{{ stats.total }} 个插件 · {{ stats.downloads }} 次下载</span>
+                    </div>
+                    <div class="stats-collapse-body">
+                        <div class="stats-row">
+                            <div class="stat-card"><span class="stat-num stat-blue">{{ stats.total }}</span><span class="stat-label">总计</span></div>
+                            <div class="stat-card"><span class="stat-num stat-green">{{ stats.approved }}</span><span class="stat-label">已审核</span></div>
+                            <div class="stat-card"><span class="stat-num stat-amber">{{ stats.pending }}</span><span class="stat-label">待审核</span></div>
+                            <div class="stat-card"><span class="stat-num stat-purple">{{ stats.downloads }}</span><span class="stat-label">总下载</span></div>
+                            <div class="stat-card"><span class="stat-num stat-cyan">{{ views.total_plugin_views }}</span><span class="stat-label">插件浏览</span></div>
+                            <div class="stat-card"><span class="stat-num stat-rose">{{ views.total_netdisk_clicks }}</span><span class="stat-label">网盘点击</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-collapse-item expanded" onclick="toggleStats(this)">
+                    <div class="stats-collapse-header">
+                        <span class="stats-collapse-icon">▼</span>
+                        <span class="stats-collapse-title">插件点击</span>
+                        <span class="stats-collapse-summary" id="dailyClicksSummary">加载中...</span>
+                    </div>
+                    <div class="stats-collapse-body">
+                        <div id="dailyPluginClicks">
+                            <p class="text-muted" style="padding:12px;">加载中...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-collapse-item expanded" onclick="toggleStats(this)">
+                    <div class="stats-collapse-header">
+                        <span class="stats-collapse-icon">▼</span>
+                        <span class="stats-collapse-title">访问数据</span>
+                        <span class="stats-collapse-summary">{{ views.total }} PV · {{ views.total_visitors }} 访客 · 今日 +{{ views.today_new_visitors }}</span>
+                    </div>
+                    <div class="stats-collapse-body">
+                        <div class="stats-row">
+                            <div class="stat-card"><span class="stat-num stat-blue">{{ views.total }}</span><span class="stat-label">总访问(PV)</span></div>
+                            <div class="stat-card"><span class="stat-num stat-green">{{ views.today }}</span><span class="stat-label">今日</span></div>
+                            <div class="stat-card"><span class="stat-num stat-amber">{{ views.yesterday }}</span><span class="stat-label">昨日</span></div>
+                            <div class="stat-card"><span class="stat-num stat-purple">{{ views.total_visitors }}</span><span class="stat-label">独立访客</span></div>
+                            <div class="stat-card"><span class="stat-num stat-cyan">{{ views.today_new_visitors }}</span><span class="stat-label">今日新访客</span></div>
+                            <div class="stat-card"><span class="stat-num stat-rose">{{ views.month_new_visitors }}</span><span class="stat-label">本月新访客</span></div>
+                        </div>
+                        <!-- 折线图：近7天访问趋势 -->
+                        <div class="chart-wrap">
+                            <canvas id="pvChart" width="600" height="200" style="width:100%;height:200px;"></canvas>
+                        </div>
+                        <!-- 下载 IP 地区统计卡片（近7天合计） -->
+                        <div class="stats-row" style="margin-top:18px;">
+                            <div class="stat-card"><span class="stat-num stat-green" id="cnDownloadTotal">0</span><span class="stat-label">中国大陆下载</span></div>
+                            <div class="stat-card"><span class="stat-num stat-indigo" id="otherDownloadTotal">0</span><span class="stat-label">其他地区下载</span></div>
+                        </div>
+                        <!-- 折线图：近7天下载趋势（悬停图表，下方列表显示当日完整明细） -->
+                        <div class="chart-wrap" style="margin-top:18px;">
+                            <canvas id="downloadChart" width="600" height="260" style="width:100%;height:260px;"></canvas>
+                        </div>
+                        <!-- 每日下载明细列表 -->
+                        <div id="downloadDetail"></div>
+                    </div>
+                </div>
+                {% if views.board_clicks %}
+                <div class="stats-collapse-item expanded" onclick="toggleStats(this)">
+                    <div class="stats-collapse-header">
+                        <span class="stats-collapse-icon">▼</span>
+                        <span class="stats-collapse-title">板块点击</span>
+                        <span class="stats-collapse-summary">总计 {{ views.total_board_clicks }} 次</span>
+                    </div>
+                    <div class="stats-collapse-body">
+                        <div class="stats-row">
+                            {% for bc in views.board_clicks %}
+                            <div class="stat-card"><span class="stat-num stat-indigo">{{ bc.clicks }}</span><span class="stat-label">{{ bc.name }}</span></div>
+                            {% endfor %}
+                            <div class="stat-card"><span class="stat-num stat-teal">{{ views.total_board_clicks }}</span><span class="stat-label">板块总计</span></div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Tabs -->
@@ -164,12 +231,43 @@
                     <button class="btn btn-sm btn-success" onclick="batchApproveMessages()">批量通过</button>
                     <button class="btn btn-sm btn-danger" onclick="batchRejectMessages()">批量拒绝</button>
                     <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="batchDeleteMessages()">批量删除</button>
+                    <button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="toggleMsgCleanup()">清理工具</button>
                     <select class="form-input" style="max-width:150px;padding:6px 10px;font-size:13px;margin-left:auto;" id="msgFilter" onchange="loadMessages()">
                         <option value="pending">待审核</option>
                         <option value="approved">已通过</option>
                         <option value="rejected">已拒绝</option>
                         <option value="all">全部</option>
                     </select>
+                </div>
+                <div id="msgCleanupBox" style="display:none;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+                    <div style="font-size:13px;font-weight:600;color:#6b21a8;margin-bottom:8px;">留言清理工具（删除不可恢复，请谨慎操作）</div>
+
+                    <div style="font-size:13px;font-weight:600;color:#991b1b;margin:8px 0 6px;">① 删除指定 IP 的全部留言</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;">
+                        <input class="form-input" style="max-width:200px;padding:6px 10px;font-size:13px;" id="cleanupIpQuick" placeholder="输入 IP 地址，如 1.2.3.4">
+                        <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="purgeIpMessages()">删除该 IP 全部留言</button>
+                        <button class="btn btn-sm" style="background:#b91c1c;color:#fff;" onclick="purgeIpMessages(true)">删除并拉黑该 IP</button>
+                    </div>
+
+                    <div style="font-size:13px;font-weight:600;color:#6b21a8;margin:14px 0 6px;">② 按条件批量清理</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;">
+                        <select class="form-input" style="max-width:120px;padding:6px 10px;font-size:13px;" id="cleanupStatus">
+                            <option value="">全部状态</option>
+                            <option value="rejected">仅已拒绝</option>
+                            <option value="pending">仅待审核</option>
+                            <option value="approved">仅已通过</option>
+                        </select>
+                        <input class="form-input" style="max-width:170px;padding:6px 10px;font-size:13px;" id="cleanupKeyword" placeholder="内容/昵称包含关键词">
+                        <input class="form-input" style="max-width:110px;padding:6px 10px;font-size:13px;" id="cleanupDays" type="number" min="1" placeholder="删除N天前">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:#475569;">
+                            <input type="checkbox" id="cleanupBlockIps" style="margin:0;"> 同时拉黑留言 ≥
+                            <input class="form-input" style="width:52px;padding:5px 6px;font-size:13px;" id="cleanupBlockMin" value="5" type="number" min="1">
+                            条的 IP
+                        </label>
+                        <button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="purgeMessages()">按条件清理</button>
+                        <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="purgeAllMessages()">清空全部留言</button>
+                    </div>
+                    <div id="cleanupResult" style="font-size:13px;margin-top:8px;"></div>
                 </div>
                 <div id="messages-list"><p class="text-muted">加载中...</p></div>
             </div>
@@ -254,6 +352,21 @@
         </div>
     </div>
 
+    <!-- 替换文件弹窗 -->
+    <div class="modal-overlay" id="replaceFileModal" onclick="if(event.target===this)closeReplaceFile()">
+        <div class="modal-box" style="max-width:480px;text-align:left;">
+            <h3 class="section-title">替换文件</h3>
+            <p id="replaceFileInfo" style="font-size:14px;color:#475569;margin:0 0 12px;"></p>
+            <div class="form-group">
+                <input class="form-file" type="file" id="replaceFileInput" required>
+            </div>
+            <div class="form-row">
+                <button class="btn btn-primary" onclick="replaceFile()">上传替换</button>
+                <button class="btn" style="background:#e2e8f0;color:#1e293b;" onclick="closeReplaceFile()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 文章编辑弹窗 -->
     <div class="modal-overlay" id="articleModal" onclick="if(event.target===this)closeArticleModal()">
         <div class="modal-box" style="max-width:600px;text-align:left;max-height:80vh;overflow-y:auto;">
@@ -301,6 +414,28 @@
                 <input class="form-input" id="board_slug" placeholder="标识（如: standards，英文字母）" maxlength="50" pattern="[a-zA-Z0-9_-]+">
                 <span style="font-size:12px;color:#94a3b8;">标识用于 URL，创建后谨慎修改</span>
             </div>
+            <div class="form-group">
+                <textarea class="form-input form-textarea" id="board_intro" rows="2" placeholder="板块简介（选填，显示在板块列表页顶部）" maxlength="500"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="board_hidden">
+                    <span>在导航栏中隐藏此板块</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label style="display:block;font-size:13px;color:#475569;margin-bottom:6px;">条目显示样式</label>
+                <div style="display:flex;gap:16px;">
+                    <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+                        <input type="radio" name="board_display_style" value="normal" checked>
+                        <span>标准卡片</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+                        <input type="radio" name="board_display_style" value="concise">
+                        <span>简洁列表</span>
+                    </label>
+                </div>
+            </div>
             <div class="form-row">
                 <button class="btn btn-primary" onclick="saveBoard()">保存</button>
                 <button class="btn" style="background:#e2e8f0;color:#1e293b;" onclick="closeBoardModal()">取消</button>
@@ -313,6 +448,9 @@
         <div class="modal-box" style="max-width:600px;text-align:left;">
             <h3 class="section-title" id="boardItemModalTitle">新增条目</h3>
             <div class="form-group"><input class="form-input" id="bi_title" placeholder="标题"></div>
+            <div class="form-group">
+                <textarea class="form-input form-textarea" id="bi_desc" rows="2" placeholder="简介（选填，标准卡片模式会显示）" maxlength="200"></textarea>
+            </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1;">
                     <input class="form-input" id="bi_file_name" placeholder="文件名（如: 建筑制图标准.pdf）">
@@ -398,10 +536,10 @@
                             : '<span class="mini-badge" style="background:#fef2f2;color:#991b1b;">' + escapeHtml(scanResults[p.id].virus || '异常') + '</span>')
                         : '<span class="mini-badge" style="background:#f1f5f9;color:#94a3b8;">未扫描</span>';
                     html += `<tr><td><input type="checkbox" class="pending-check" value="${p.id}"></td>
-                        <td><strong>${p.name}</strong></td><td>${p.author}</td><td>${size}</td><td><span class="mini-badge">${ext}</span></td>
-                        <td id="scan-cell-${p.id}">${scanStatus}</td>
-                        <td>${p.created_at}</td>
-                        <td class="action-cell">
+                        <td data-label="名称"><strong>${p.name}</strong></td><td data-label="作者">${p.author}</td><td data-label="大小">${size}</td><td data-label="类型"><span class="mini-badge">${ext}</span></td>
+                        <td data-label="扫描" id="scan-cell-${p.id}">${scanStatus}</td>
+                        <td data-label="时间">${p.created_at}</td>
+                        <td class="action-cell" data-label="">
                             <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="window.open('/admin/api/pending/${p.id}/download')">下载</button>
                             <button class="btn btn-sm" style="background:#8b5cf6;color:#fff;" onclick="scanPlugin(${p.id})" id="scan-btn-${p.id}">扫描</button>
                             <button class="btn btn-sm btn-success" onclick="approve(${p.id})">通过</button>
@@ -478,16 +616,17 @@
                 const data = await res.json();
                 approvedTotal = data.total;
                 if (!data.plugins.length) { el.innerHTML = '<p class="text-muted">暂无已审核插件</p>'; renderApprovedPager(); return; }
-                let html = `<table class="admin-table"><thead><tr><th>名称</th><th>作者</th><th>下载方式</th><th>状态</th><th>下载</th><th>时间</th><th>操作</th></tr></thead><tbody>`;
+                let html = `<table class="admin-table"><thead><tr><th>名称</th><th>作者</th><th>文件名</th><th>下载方式</th><th>状态</th><th>下载</th><th>时间</th><th>操作</th></tr></thead><tbody>`;
                 for (const p of data.plugins) {
                     const status = p.disabled ? '<span class="mini-badge" style="background:#fef2f2;color:#991b1b;">已下架</span>' : '<span class="mini-badge" style="background:#f0fdf4;color:#166534;">正常</span>';
                     const modeLabel = p.download_mode === 'both' ? '<span class="mini-badge" style="background:#dbeafe;color:#1d4ed8;">直链+网盘</span>'
                         : p.download_mode === 'netdisk_only' ? '<span class="mini-badge" style="background:#dbeafe;color:#1d4ed8;">仅网盘</span>'
                         : '<span class="mini-badge" style="background:#f1f5f9;color:#64748b;">仅直链</span>';
-                    html += `<tr><td><strong>${p.name}</strong></td><td>${p.author}</td><td>${modeLabel}</td><td>${status}</td>
-                        <td>${p.downloads}</td><td>${p.created_at}</td>
-                        <td class="action-cell">
+                    html += `<tr><td data-label="名称"><strong>${p.name}</strong></td><td data-label="作者">${p.author}</td><td data-label="文件名" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.file_name}">${p.file_name}</td><td data-label="下载方式">${modeLabel}</td><td data-label="状态">${status}</td>
+                        <td data-label="下载">${p.downloads}</td><td data-label="时间">${p.created_at}</td>
+                        <td class="action-cell" data-label="">
                             <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="editPlugin(${p.id})">编辑</button>
+                            <button class="btn btn-sm" style="background:#8b5cf6;color:#fff;" onclick="showReplaceFile(${p.id})">替换文件</button>
                             <button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="toggleDisable(${p.id},${p.disabled})">${p.disabled?'上架':'下架'}</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteApproved(${p.id})">删除</button>
                         </td></tr>`;
@@ -568,6 +707,42 @@
         function closeEdit() {
             editingId = null;
             document.getElementById('editModal').classList.remove('active');
+        }
+
+        // ── Replace File ──
+        let replaceFileId = null;
+
+        function showReplaceFile(id) {
+            replaceFileId = id;
+            const row = document.querySelector(`#approved-list tr:has(button[onclick*="showReplaceFile(${id})"])`);
+            const name = row ? row.querySelector('td')?.textContent || '' : '';
+            document.getElementById('replaceFileInfo').textContent = '替换插件 #' + id + (name ? ' 「' + name.trim() + '」' : '') + ' 的文件';
+            document.getElementById('replaceFileInput').value = '';
+            document.getElementById('replaceFileModal').classList.add('active');
+        }
+
+        async function replaceFile() {
+            const input = document.getElementById('replaceFileInput');
+            if (!input.files.length) return alert('请选择文件');
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            const res = await fetch(`/admin/api/approved/${replaceFileId}/replace-file`, {
+                method: 'POST',
+                body: fd,
+            });
+            if (res.ok) {
+                alert('文件替换成功！');
+                closeReplaceFile();
+                loadApproved();
+            } else {
+                const data = await res.json();
+                alert(data.error || '替换失败');
+            }
+        }
+
+        function closeReplaceFile() {
+            replaceFileId = null;
+            document.getElementById('replaceFileModal').classList.remove('active');
         }
 
         // ── Direct Upload ──
@@ -688,9 +863,9 @@
                         ? '<span class="mini-badge" style="background:#dbeafe;color:#1e40af;">通知</span>'
                         : '<span class="mini-badge" style="background:#f0fdf4;color:#166534;">说明</span>';
                     const pinnedLabel = a.pinned ? '<span class="mini-badge" style="background:#fef3c7;color:#b45309;">置顶</span>' : '-';
-                    html += `<tr><td>${typeLabel}</td><td><strong>${a.title}</strong></td>
-                        <td>${a.plugin_name || '-'}</td><td>${pinnedLabel}</td><td>${a.created_at}</td>
-                        <td class="action-cell">
+                    html += `<tr><td data-label="类型">${typeLabel}</td><td data-label="标题"><strong>${a.title}</strong></td>
+                        <td data-label="关联插件">${a.plugin_name || '-'}</td><td data-label="置顶">${pinnedLabel}</td><td data-label="时间">${a.created_at}</td>
+                        <td class="action-cell" data-label="">
                             <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="editArticle(${a.id})">编辑</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteArticle(${a.id})">删除</button>
                         </td></tr>`;
@@ -858,9 +1033,11 @@
                     const b = boardsData[i];
                     html += '<div class="standards-admin-item" style="margin-bottom:4px;">' +
                         '<div class="standards-admin-header">' +
-                            '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">' +
+							'<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">' +
                                 '<strong style="font-size:15px;">' + escapeHtml(b.name) + '</strong>' +
                                 '<code style="font-size:12px;color:#64748b;">/' + escapeHtml(b.slug) + '</code>' +
+                                (b.hidden == 1 ? '<span class="mini-badge" style="background:#f1f5f9;color:#94a3b8;">已隐藏</span>' : '') +
+                                '<span class="mini-badge" style="background:#f0fdf4;color:#16a34a;">' + (b.display_style === 'concise' ? '简洁列表' : '标准卡片') + '</span>' +
                                 '<span style="font-size:11px;color:#94a3b8;">' + b.items.length + ' 个条目</span>' +
                             '</div>' +
                             '<div class="action-cell" style="flex-shrink:0;">' +
@@ -872,8 +1049,9 @@
                             '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
                     for (const item of b.items) {
                         const badge = item.file_url ? '<span class="mini-badge" style="background:#dbeafe;color:#1d4ed8;padding:1px 5px;font-size:10px;">网盘</span>' : '';
+                        const descBadge = item.description ? '<span class="mini-badge" style="background:#fef3c7;color:#b45309;font-size:10px;">简介</span>' : '';
                         html += '<span style="display:inline-flex;align-items:center;gap:4px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:13px;">' +
-                            escapeHtml(item.title) + ' ' + badge +
+                            escapeHtml(item.title) + ' ' + descBadge + ' ' + badge +
                             ' <a href="#" onclick="event.preventDefault();editBoardItem(' + item.id + ')" style="color:#2563eb;font-size:12px;">编辑</a>' +
                             ' <a href="#" onclick="event.preventDefault();deleteBoardItem(' + item.id + ')" style="color:#ef4444;font-size:12px;">x</a>' +
                         '</span>';
@@ -892,6 +1070,9 @@
             document.getElementById('boardModalTitle').textContent = '新增板块';
             document.getElementById('board_name').value = '';
             document.getElementById('board_slug').value = '';
+            document.getElementById('board_intro').value = '';
+            document.getElementById('board_hidden').checked = false;
+            document.querySelector('input[name="board_display_style"][value="normal"]').checked = true;
             document.getElementById('boardModal').classList.add('active');
         }
 
@@ -903,6 +1084,11 @@
                 const b = await res.json();
                 document.getElementById('board_name').value = b.name || '';
                 document.getElementById('board_slug').value = b.slug || '';
+                document.getElementById('board_intro').value = b.intro || '';
+                document.getElementById('board_hidden').checked = b.hidden == 1;
+                const style = b.display_style || 'normal';
+                const styleRadio = document.querySelector('input[name="board_display_style"][value="' + style + '"]');
+                if (styleRadio) styleRadio.checked = true;
                 document.getElementById('boardModal').classList.add('active');
             } catch(e) { alert('加载失败'); }
         }
@@ -910,8 +1096,16 @@
         async function saveBoard() {
             const name = document.getElementById('board_name').value.trim();
             const slug = document.getElementById('board_slug').value.trim();
+            const intro = document.getElementById('board_intro').value.trim();
+            const hidden = document.getElementById('board_hidden').checked;
             if (!name || !slug) return alert('名称和标识不能为空');
-            const body = JSON.stringify({ name: name, slug: slug });
+            const body = JSON.stringify({
+                name: name,
+                slug: slug,
+                intro: intro,
+                hidden: hidden,
+                display_style: document.querySelector('input[name="board_display_style"]:checked').value,
+            });
             if (editingBoardId) {
                 const res = await fetch('/admin/api/boards/' + editingBoardId, {
                     method: 'PUT',
@@ -949,6 +1143,7 @@
             currentItemBoardId = boardId;
             document.getElementById('boardItemModalTitle').textContent = '新增条目';
             document.getElementById('bi_title').value = '';
+            document.getElementById('bi_desc').value = '';
             document.getElementById('bi_file_name').value = '';
             document.getElementById('bi_file_url').value = '';
             document.getElementById('boardItemModal').classList.add('active');
@@ -966,6 +1161,7 @@
             }
             if (!item) return alert('加载失败');
             document.getElementById('bi_title').value = item.title || '';
+            document.getElementById('bi_desc').value = item.description || '';
             document.getElementById('bi_file_name').value = item.file_name || '';
             document.getElementById('bi_file_url').value = item.file_url || '';
             document.getElementById('boardItemModal').classList.add('active');
@@ -973,10 +1169,11 @@
 
         async function saveBoardItem() {
             const title = document.getElementById('bi_title').value.trim();
+            const description = document.getElementById('bi_desc').value.trim();
             const file_name = document.getElementById('bi_file_name').value.trim();
             const file_url = document.getElementById('bi_file_url').value.trim();
             if (!title) return alert('标题不能为空');
-            const body = JSON.stringify({ title: title, file_name: file_name, file_url: file_url });
+            const body = JSON.stringify({ title: title, description: description, file_name: file_name, file_url: file_url });
             if (editingBoardItemId) {
                 await fetch('/admin/api/board-items/' + editingBoardItemId, {
                     method: 'PUT',
@@ -1026,17 +1223,20 @@
                             ? '<span class="mini-badge" style="background:#fef2f2;color:#991b1b;">危险</span>'
                             : '<span class="mini-badge" style="background:#f0fdf4;color:#166534;">安全</span>'}`
                         : '<span class="text-muted">-</span>';
-                    html += `<tr><td><input type="checkbox" class="msg-check" value="${m.id}"></td>
-                        <td>${m.plugin_name || '全站'}</td><td>${m.author}</td>
-                        <td style="white-space:nowrap;">${ipDisplay}</td>
-                        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${m.content.replace(/"/g,'&quot;')}">${m.content}</td>
-                        <td>${m.created_at}</td><td>${statusLabel}</td>
-                        <td class="action-cell">`;
+                    html += `<tr><td data-label=""><input type="checkbox" class="msg-check" value="${m.id}"></td>
+                        <td data-label="插件">${m.plugin_name || '全站'}</td><td data-label="用户">${m.author}</td>
+                        <td data-label="IP" style="white-space:nowrap;">${ipDisplay}</td>
+                        <td data-label="内容" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${m.content.replace(/"/g,'&quot;')}">${m.content}</td>
+                        <td data-label="时间">${m.created_at}</td><td data-label="状态">${statusLabel}</td>
+                        <td class="action-cell" data-label="">`;
                     if (m.status === 'pending') {
                         html += `<button class="btn btn-sm btn-success" onclick="approveMsg(${m.id})">通过</button>
                             <button class="btn btn-sm btn-danger" onclick="rejectMsg(${m.id})">拒绝</button>`;
                     }
                     html += `<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="deleteMsg(${m.id})">删除</button>`;
+                    if (m.ip_address) {
+                        html += `<button class="btn btn-sm" style="background:#b91c1c;color:#fff;" onclick="purgeIpMessages(false,'${m.ip_address}')">删该IP全部留言</button>`;
+                    }
                     html += `</td></tr>`;
                 }
                 html += '</tbody></table>';
@@ -1071,6 +1271,99 @@
             loadMessages();
         }
 
+        function toggleMsgCleanup() {
+            const box = document.getElementById('msgCleanupBox');
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showCleanupResult(text, color) {
+            const el = document.getElementById('cleanupResult');
+            el.innerHTML = text;
+            el.style.color = color || '#166534';
+        }
+
+        // ── 删除指定 IP 的全部留言（核心功能） ──
+        async function purgeIpMessages(alsoBlock, ip) {
+            if (!ip) ip = document.getElementById('cleanupIpQuick').value.trim();
+            if (!ip) return alert('请先输入 IP 地址');
+            const action = alsoBlock ? '删除并拉黑' : '删除';
+            if (!confirm(`确定${action} IP [${ip}] 的全部留言？此操作不可恢复！`)) return;
+            const code = prompt(`请再次输入该 IP（${ip}）确认执行`);
+            if (code !== ip) { alert('已取消'); return; }
+            const res = await fetch('/admin/api/messages/purge', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ip: ip, block_ips: !!alsoBlock, block_min: 1}),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || '操作失败'); return; }
+            let msg = '已删除 IP [' + ip + '] 的 <b>' + data.deleted + '</b> 条留言';
+            if (alsoBlock && data.blocked_ips && data.blocked_ips.length) {
+                msg += '，并已将该 IP 加入黑名单';
+            }
+            showCleanupResult(msg);
+            document.getElementById('cleanupIpQuick').value = '';
+            loadMessages();
+        }
+
+        function msgCleanupParams() {
+            const status = document.getElementById('cleanupStatus').value || null;
+            const keyword = document.getElementById('cleanupKeyword').value.trim() || null;
+            const days = parseInt(document.getElementById('cleanupDays').value);
+            let before = null;
+            if (days > 0) {
+                const d = new Date(Date.now() - days * 86400000);
+                before = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            }
+            return {
+                status: status, keyword: keyword, before: before,
+                block_ips: document.getElementById('cleanupBlockIps').checked,
+                block_min: parseInt(document.getElementById('cleanupBlockMin').value) || 5,
+            };
+        }
+
+        async function purgeMessages() {
+            const p = msgCleanupParams();
+            if (!p.status && !p.keyword && !p.before) return alert('请至少设置一个条件（清空全部请用右侧红色按钮）');
+            const desc = [p.status && ('状态=' + p.status), p.keyword && ('含"' + p.keyword + '"'), p.before && (p.before + '之前')].filter(Boolean).join('、');
+            if (!confirm('即将永久删除【' + desc + '】的留言，此操作不可恢复！')) return;
+            const code = prompt('请再次输入"确认"以执行删除');
+            if (code !== '确认') { alert('已取消'); return; }
+            const res = await fetch('/admin/api/messages/purge', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(p),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || '清理失败'); return; }
+            let msg = '已删除 <b>' + data.deleted + '</b> 条留言';
+            if (data.blocked_ips && data.blocked_ips.length) {
+                msg += '，同时拉黑 ' + data.blocked_ips.length + ' 个 IP：' + data.blocked_ips.map(b => b.ip + '(' + b.count + '条)').join('、');
+            }
+            showCleanupResult(msg);
+            loadMessages();
+        }
+
+        async function purgeAllMessages() {
+            if (!confirm('即将清空全部留言（包括已通过的正常留言），此操作不可恢复！')) return;
+            const code = prompt('此操作会删除所有留言，请输入"确认删除"继续');
+            if (code !== '确认删除') { alert('已取消'); return; }
+            const p = msgCleanupParams();
+            const res = await fetch('/admin/api/messages/purge', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: null, keyword: null, before: null, block_ips: p.block_ips, block_min: p.block_min}),
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || '清理失败'); return; }
+            let msg = '已清空 <b>' + data.deleted + '</b> 条留言';
+            if (data.blocked_ips && data.blocked_ips.length) {
+                msg += '，同时拉黑 ' + data.blocked_ips.length + ' 个 IP：' + data.blocked_ips.map(b => b.ip + '(' + b.count + '条)').join('、');
+            }
+            showCleanupResult(msg);
+            loadMessages();
+        }
+
         // ── 管理员 IP 管理（发留言显示"管理员"） ──
         async function loadAdminIPs() {
             const el = document.getElementById('admin-ips-list');
@@ -1080,8 +1373,8 @@
                 if (!data.length) { el.innerHTML = '<p class="text-muted">暂无管理员 IP</p>'; return; }
                 let html = `<table class="admin-table"><thead><tr><th>IP 地址</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead><tbody>`;
                 for (const a of data) {
-                    html += `<tr><td><code>${a.ip_address}</code></td><td>${a.remark || '-'}</td><td>${a.created_at}</td>
-                        <td class="action-cell">
+                    html += `<tr><td data-label="IP 地址"><code>${a.ip_address}</code></td><td data-label="备注">${a.remark || '-'}</td><td data-label="添加时间">${a.created_at}</td>
+                        <td class="action-cell" data-label="">
                             <button class="btn btn-sm btn-danger" onclick="deleteAdminIP(${a.id})">移除</button>
                         </td></tr>`;
                 }
@@ -1124,8 +1417,8 @@
                 if (!data.length) { el.innerHTML = '<p class="text-muted">暂无拉黑的 IP</p>'; return; }
                 let html = `<table class="admin-table"><thead><tr><th>IP 地址</th><th>原因</th><th>拉黑时间</th><th>操作</th></tr></thead><tbody>`;
                 for (const b of data) {
-                    html += `<tr><td><code>${b.ip_address}</code></td><td>${b.reason || '-'}</td><td>${b.created_at}</td>
-                        <td class="action-cell">
+                    html += `<tr><td data-label="IP 地址"><code>${b.ip_address}</code></td><td data-label="原因">${b.reason || '-'}</td><td data-label="拉黑时间">${b.created_at}</td>
+                        <td class="action-cell" data-label="">
                             <button class="btn btn-sm btn-danger" onclick="deleteBlockedIP(${b.id})">移除</button>
                         </td></tr>`;
                 }
@@ -1174,11 +1467,11 @@
                         : r.status === 'rejected'
                         ? '<span class="mini-badge" style="background:#fef2f2;color:#991b1b;">已拒绝</span>'
                         : '<span class="mini-badge" style="background:#fef3c7;color:#b45309;">待处理</span>';
-                    html += `<tr><td><code>${r.ip_address}</code></td>
-                        <td style="max-width:300px;">${escapeHtml(r.reason)}</td>
-                        <td>${statusLabel}</td>
-                        <td>${r.created_at}</td>
-                        <td class="action-cell">`;
+                    html += `<tr><td data-label="IP 地址"><code>${r.ip_address}</code></td>
+                        <td data-label="理由" style="max-width:300px;">${escapeHtml(r.reason)}</td>
+                        <td data-label="状态">${statusLabel}</td>
+                        <td data-label="申请时间">${r.created_at}</td>
+                        <td class="action-cell" data-label="">`;
                     if (r.status === 'pending') {
                         html += `<button class="btn btn-sm btn-success" onclick="approveUnblock(${r.id})">通过</button>
                             <button class="btn btn-sm btn-danger" onclick="rejectUnblock(${r.id})">拒绝</button>`;
@@ -1218,11 +1511,11 @@
                     const safeBadge = v.is_blocked
                         ? '<span class="mini-badge" style="background:#fef2f2;color:#991b1b;">危险</span>'
                         : '<span class="mini-badge" style="background:#f0fdf4;color:#166534;">安全</span>';
-                    html += `<tr><td><code>${v.ip_address}</code></td>
-                        <td>${safeBadge}</td>
-                        <td>${v.first_visited_at}</td>
-                        <td>${v.last_visited_at}</td>
-                        <td>${v.visit_count}</td></tr>`;
+                    html += `<tr><td data-label="IP 地址"><code>${v.ip_address}</code></td>
+                        <td data-label="安全状态">${safeBadge}</td>
+                        <td data-label="首次访问">${v.first_visited_at}</td>
+                        <td data-label="最近访问">${v.last_visited_at}</td>
+                        <td data-label="访问次数">${v.visit_count}</td></tr>`;
                 }
                 html += '</tbody></table>';
                 el.innerHTML = html;
@@ -1295,6 +1588,394 @@
                 errEl.textContent = '请求失败'; errEl.style.display = '';
             }
         }
+
+        // ── 可折叠统计 ──
+        function toggleStats(el) {
+            el.classList.toggle('expanded');
+        }
+
+        // ── 折线图（带悬浮提示） ──
+        function drawMultiLineChart(canvasId, series, opts) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !series || series.length < 1) return;
+            for (const s of series) {
+                if (!s.data || s.data.length < 2) return;
+            }
+
+            const chartHeight = (opts && opts.height) || 220;
+            const dpr = window.devicePixelRatio || 2;
+            const pad = { top: 32, right: 24, bottom: 48, left: 60 };
+
+            let W, H, ctx, w, h, allValues, labels, fullDates, max, xStep, seriesPoints, hoverIndex;
+
+            function calc() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                W = canvas.width = Math.max(rect.width || 600, 400) * dpr;
+                H = canvas.height = chartHeight * dpr;
+                canvas.style.height = chartHeight + 'px';
+                ctx = canvas.getContext('2d');
+                w = W - pad.left - pad.right;
+                h = H - pad.top - pad.bottom;
+
+                allValues = [];
+                labels = series[0].data.map(d => (d.date || '').slice(5));
+                fullDates = series[0].data.map(d => d.date || '');
+                for (const s of series) {
+                    allValues = allValues.concat(s.data.map(d => d.count || 0));
+                }
+                max = Math.max(...allValues, 1);
+                xStep = w / Math.max(labels.length - 1, 1);
+
+                seriesPoints = series.map(s => ({
+                    label: s.label,
+                    color: s.color,
+                    points: s.data.map((d, i) => ({
+                        x: pad.left + i * xStep,
+                        y: pad.top + h - ((d.count || 0) / max) * h,
+                        v: d.count || 0,
+                    })),
+                }));
+
+                // 仅在数据点数量变化时清理悬停索引（不能每次重绘都重置，否则 tooltip 永不显示）
+                if (hoverIndex >= series[0].data.length) hoverIndex = -1;
+            }
+
+            function render() {
+                calc();
+                ctx.clearRect(0, 0, W, H);
+
+                // Grid
+                ctx.strokeStyle = '#f1f5f9';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 4; i++) {
+                    const y = pad.top + (h / 4) * i;
+                    ctx.beginPath(); ctx.moveTo(pad.left / dpr, y / dpr);
+                    ctx.lineTo((pad.left + w) / dpr, y / dpr);
+                    ctx.stroke();
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '11px system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(Math.round(max - (max / 4) * i), (pad.left - 8) / dpr, y / dpr + 4);
+                }
+
+                // X labels
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '11px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                seriesPoints[0].points.forEach(p => {
+                    const idx = seriesPoints[0].points.indexOf(p);
+                    ctx.fillText(labels[idx], p.x / dpr, (pad.top + h + 20) / dpr);
+                });
+
+                // Draw series
+                for (const sp of seriesPoints) {
+                    if (seriesPoints.indexOf(sp) === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(sp.points[0].x / dpr, (pad.top + h) / dpr);
+                        sp.points.forEach(p => ctx.lineTo(p.x / dpr, p.y / dpr));
+                        ctx.lineTo(sp.points[sp.points.length - 1].x / dpr, (pad.top + h) / dpr);
+                        ctx.closePath();
+                        const grad = ctx.createLinearGradient(0, pad.top / dpr, 0, (pad.top + h) / dpr);
+                        grad.addColorStop(0, sp.color + '20');
+                        grad.addColorStop(1, sp.color + '05');
+                        ctx.fillStyle = grad;
+                        ctx.fill();
+                    }
+
+                    ctx.beginPath();
+                    sp.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x / dpr, p.y / dpr) : ctx.lineTo(p.x / dpr, p.y / dpr));
+                    ctx.strokeStyle = sp.color;
+                    ctx.lineWidth = 2;
+                    ctx.lineJoin = 'round';
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    sp.points.forEach(p => {
+                        const idx = sp.points.indexOf(p);
+                        const isHover = seriesPoints.indexOf(sp) === 0 && idx === hoverIndex;
+                        ctx.beginPath();
+                        ctx.arc(p.x / dpr, p.y / dpr, 4.5, 0, Math.PI * 2);
+                        ctx.fillStyle = isHover ? sp.color : '#fff';
+                        ctx.fill();
+                        ctx.strokeStyle = sp.color;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    });
+                }
+
+                // Legend
+                const legendX = pad.left;
+                const legendY = 16;
+                series.forEach((s, i) => {
+                    const lx = legendX + i * 200;
+                    ctx.fillStyle = s.color;
+                    ctx.fillRect(lx / dpr, (legendY - 6) / dpr, 16 / dpr, 3 / dpr);
+                    ctx.beginPath();
+                    ctx.arc((lx + 8) / dpr, (legendY - 4.5) / dpr, 3.5 / dpr, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '12px system-ui, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(s.label, (lx + 22) / dpr, (legendY + 1) / dpr);
+                });
+
+                // Hover indicator
+                if (hoverIndex >= 0 && hoverIndex < seriesPoints[0].points.length) {
+                    const hp = seriesPoints[0].points[hoverIndex];
+                    // Vertical dash line
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4 / dpr, 4 / dpr]);
+                    ctx.beginPath();
+                    ctx.moveTo(hp.x / dpr, pad.top / dpr);
+                    ctx.lineTo(hp.x / dpr, (pad.top + h) / dpr);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Tooltip（每行按实际渲染字体测量宽度，白框自适应文字长度）
+                    let tooltipLines = [];
+                    let maxTextW = 0;
+                    const measureLine = (txt, bold) => {
+                        ctx.font = bold ? '13px system-ui, sans-serif' : '12px system-ui, sans-serif';
+                        const w = ctx.measureText(txt).width;
+                        if (w > maxTextW) maxTextW = w;
+                    };
+                    const dateLabel = fullDates[hoverIndex];
+                    tooltipLines.push({ text: dateLabel, color: '#0f172a', bold: true });
+                    measureLine(dateLabel, true);
+                    for (const sp of seriesPoints) {
+                        const val = sp.points[hoverIndex].v;
+                        const txt = `${sp.label}: ${val}`;
+                        tooltipLines.push({ text: txt, color: sp.color, bold: false });
+                        measureLine(txt, false);
+                    }
+
+                    // tooltip 尺寸/坐标全部按物理像素计算，与文字测量、绘制保持一致（高分屏 dpr>1 时不会溢出）
+                    const tooltipW = Math.max(maxTextW + 28 * dpr, 100 * dpr);
+                    const lineH = 20 * dpr;
+                    const tooltipH = tooltipLines.length * lineH + 12 * dpr;
+                    let tx = hp.x + 14 * dpr;
+                    let ty = hp.y - 10 * dpr;
+                    if (tx + tooltipW > pad.left + w) tx = hp.x - tooltipW - 14 * dpr;
+                    if (tx < 4 * dpr) tx = 4 * dpr;
+                    if (ty < 4 * dpr) ty = 4 * dpr;
+                    // 允许 tooltip 使用整个画布高度（下载明细较多时）
+                    if (ty + tooltipH > H - 4 * dpr) ty = H - 4 * dpr - tooltipH;
+                    if (ty < 4 * dpr) ty = 4 * dpr;
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+                    ctx.shadowColor = 'rgba(0,0,0,0.10)';
+                    ctx.shadowBlur = 12 * dpr;
+                    ctx.shadowOffsetY = 2 * dpr;
+                    ctx.beginPath();
+                    ctx.roundRect(tx, ty, tooltipW, tooltipH, 8 * dpr);
+                    ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.roundRect(tx, ty, tooltipW, tooltipH, 8 * dpr);
+                    ctx.stroke();
+
+                    let textY = ty + 18 * dpr;
+                    for (const line of tooltipLines) {
+                        ctx.fillStyle = line.color;
+                        ctx.font = line.bold ? '13px system-ui, sans-serif' : '12px system-ui, sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(line.text, tx + 12 * dpr, textY);
+                        textY += lineH;
+                    }
+                }
+            }
+
+            canvas.onmousemove = function(e) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left) * dpr;
+                const my = (e.clientY - rect.top) * dpr;
+
+                let nearest = -1;
+                let minDist = Infinity;
+                for (const sp of seriesPoints) {
+                    for (const p of sp.points) {
+                        const dx = mx - p.x;
+                        const dy = my - p.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < minDist && dist < 60 * dpr) {
+                            minDist = dist;
+                            nearest = sp.points.indexOf(p);
+                        }
+                    }
+                }
+                if (nearest !== hoverIndex) {
+                    hoverIndex = nearest;
+                    render();
+                    if (opts.onHover) opts.onHover(hoverIndex);
+                }
+            };
+
+            canvas.onmouseleave = function() {
+                if (hoverIndex !== -1) {
+                    hoverIndex = -1;
+                    render();
+                    if (opts.onHover) opts.onHover(-1);
+                }
+            };
+
+            render();
+        }
+
+        // ── 加载当日插件点击统计 ──
+        async function loadDailyClicks() {
+            const el = document.getElementById('dailyPluginClicks');
+            const summary = document.getElementById('dailyClicksSummary');
+            try {
+                const res = await fetch('/admin/api/stats/daily-plugin-clicks');
+                const data = await res.json();
+                if (data.items && data.items.length) {
+                    let html = '<div style="display:flex;flex-direction:column;">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #e2e8f0;font-size:13px;font-weight:600;color:#64748b;">' +
+                            '<span>插件名称</span>' +
+                            '<div style="display:flex;gap:24px;">' +
+                                '<span style="width:60px;text-align:right;">网盘点击</span>' +
+                                '<span style="width:60px;text-align:right;">下载次数</span>' +
+                            '</div>' +
+                        '</div>';
+                    data.items.forEach(p => {
+                        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;">' +
+                            '<span style="color:#1e293b;">' + escapeHtml(p.name) + '</span>' +
+                            '<div style="display:flex;gap:24px;">' +
+                                '<span style="width:60px;text-align:right;color:#2563eb;font-weight:600;">' + p.click_count + '</span>' +
+                                '<span style="width:60px;text-align:right;color:#059669;font-weight:600;">' + p.download_count + '</span>' +
+                            '</div>' +
+                        '</div>';
+                    });
+                    html += '</div>';
+                    el.innerHTML = html;
+                    summary.textContent = '网盘 ' + data.total_clicks + ' 次 · 下载 ' + data.total_downloads + ' 次 · ' + data.items.length + ' 个插件';
+                } else {
+                    el.innerHTML = '<p class="text-muted" style="padding:12px;">今日暂无数据</p>';
+                    summary.textContent = '今日 0 次';
+                }
+            } catch(e) {
+                el.innerHTML = '<p class="text-muted" style="padding:12px;">加载失败</p>';
+                summary.textContent = '加载失败';
+            }
+        }
+
+        // ── 每日下载明细列表（悬停图表时展示对应日期的完整明细） ──
+        let dlData = [];
+
+        // 地区徽标
+        function regionBadge(region) {
+            const isCn = region === '中国大陆';
+            return '<span class="dl-detail-region ' + (isCn ? 'region-cn' : 'region-other') + '">' + (isCn ? '中国大陆' : '其他地区') + '</span> ';
+        }
+
+        // 点击 IP 展开该 IP 当日下载了哪些插件
+        async function toggleIpDetail(dateStr, ip, region, rowEl) {
+            const prev = rowEl.nextElementSibling;
+            if (prev && prev.classList.contains('dl-detail-ip-body')) {
+                prev.remove();
+                return;
+            }
+            document.querySelectorAll('#downloadDetail .dl-detail-ip-body').forEach(el => el.remove());
+            const typeName = {download: '直接下载', netdisk: '网盘点击'};
+            let rows = '<div class="dl-detail-empty">加载中...</div>';
+            try {
+                const res = await fetch('/admin/api/stats/ip-downloads?date=' + encodeURIComponent(dateStr) + '&ip=' + encodeURIComponent(ip));
+                const data = await res.json();
+                const items = data.items || [];
+                rows = items.map(it =>
+                    '<div class="dl-detail-ip-item">' +
+                        '<span class="dl-detail-ip-name">' + escapeHtml(it.plugin_name) + '</span>' +
+                        '<span class="dl-detail-ip-badge ' + (it.event_type === 'download' ? 'badge-dl' : 'badge-nd') + '">' + (typeName[it.event_type] || it.event_type) + '</span>' +
+                        '<span class="dl-detail-ip-time">' + escapeHtml(it.created_at) + '</span>' +
+                    '</div>'
+                ).join('');
+                if (!items.length) rows = '<div class="dl-detail-empty">该 IP 当日无下载记录</div>';
+            } catch(e) {
+                rows = '<div class="dl-detail-empty">加载失败</div>';
+            }
+            rowEl.insertAdjacentHTML('afterend',
+                '<div class="dl-detail-ip-body">' +
+                    '<div class="dl-detail-ip-head">' + regionBadge(region) + escapeHtml(ip) + ' · 下载明细</div>' +
+                    rows +
+                '</div>');
+        }
+
+        function renderDownloadDetail(idx) {
+            if (!dlData || idx < 0 || idx >= dlData.length) return;
+            const el = document.getElementById('downloadDetail');
+            if (!el) return;
+            const day = dlData[idx];
+            const ips = (Array.isArray(day.ips) && day.ips.length) ? day.ips : [];
+            el.className = 'dl-detail';
+            const cnIps = ips.filter(it => it.region === '中国大陆');
+            const otherIps = ips.filter(it => it.region !== '中国大陆');
+            const cnCount = cnIps.reduce((s, it) => s + it.count, 0);
+            const otherCount = otherIps.reduce((s, it) => s + it.count, 0);
+            let rows = ips.map(it =>
+                '<div class="dl-detail-row dl-detail-row-clickable" title="点击查看该 IP 下载了哪些插件" onclick="event.stopPropagation();toggleIpDetail(\'' + escapeHtml(day.date) + '\', \'' + escapeHtml(it.ip) + '\', \'' + escapeHtml(it.region || '其他地区') + '\', this)">' +
+                    regionBadge(it.region || '其他地区') +
+                    '<span class="dl-detail-ip">' + escapeHtml(it.ip) + '</span>' +
+                    '<span class="dl-detail-count">' + it.count + ' 次</span>' +
+                '</div>'
+            ).join('');
+            el.innerHTML =
+                '<div class="dl-detail-head">' +
+                    '<span class="dl-detail-title">' + escapeHtml(day.date) + ' 下载明细</span>' +
+                    '<span class="dl-detail-total">' +
+                        '中国大陆 ' + cnIps.length + ' 个 IP / ' + cnCount + ' 次 · ' +
+                        '其他地区 ' + otherIps.length + ' 个 IP / ' + otherCount + ' 次' +
+                    '</span>' +
+                '</div>' +
+                '<div class="dl-detail-list">' + (rows || '<div class="dl-detail-empty">该日暂无下载记录</div>') + '</div>';
+        }
+
+        // ── 渲染折线图 ──
+        function initChart() {
+            const pvData = {{ views.daily | tojson | safe }};
+            const visitorData = {{ views.new_visitor_trend | tojson | safe }};
+            dlData = {{ views.download_trend | tojson | safe }};
+            // 下载地区统计：默认显示今日，悬停折线图时联动显示对应日期
+            function updateRegionCards(day) {
+                document.getElementById('cnDownloadTotal').textContent = day ? (day.cn_count || 0) : 0;
+                document.getElementById('otherDownloadTotal').textContent = day ? (day.other_count || 0) : 0;
+            }
+            function todayStr() {
+                const d = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+            }
+            const todayEntry = (dlData || []).find(d => d.date === todayStr());
+            updateRegionCards(todayEntry || null);
+            if (pvData && pvData.length >= 2) {
+                drawMultiLineChart('pvChart', [
+                    { label: '页面访问 (PV)', data: pvData, color: '#2563eb' },
+                    { label: '新增访客', data: visitorData, color: '#7c3aed' },
+                ]);
+            }
+            if (dlData && dlData.length >= 2) {
+                drawMultiLineChart('downloadChart', [
+                    { label: '下载量', data: dlData, color: '#059669' },
+                ], { height: 260, onHover: function(idx) {
+                    renderDownloadDetail(idx);
+                    updateRegionCards(idx >= 0 ? dlData[idx] : null);
+                } });
+                renderDownloadDetail(dlData.length - 1);
+            }
+        }
+
+        let chartTimer;
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            loadDailyClicks();
+        });
+        window.addEventListener('resize', function() {
+            clearTimeout(chartTimer);
+            chartTimer = setTimeout(initChart, 200);
+        });
 
         // ── Init ──
         fetchCategories().then(() => { loadPending(); });

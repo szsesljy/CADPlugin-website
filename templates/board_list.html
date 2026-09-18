@@ -5,16 +5,48 @@
     <div class="section-header">
         <div>
             <h1 class="section-title-lg">{{ board.name }}</h1>
+            {% if board.intro %}
+            <p class="section-desc">{{ board.intro }}</p>
+            {% endif %}
         </div>
     </div>
 
     {% if items %}
+    {% if board.display_style == 'concise' %}
+    <!-- 简洁模式：纯列表 -->
+    <div class="concise-list">
+        {% for item in items %}
+        <a href="/board/{{ board.slug }}/{{ item.id }}" class="concise-item">
+            <span class="concise-item-title">{{ item.title }}</span>
+            <span class="concise-item-meta">
+                <span class="board-click-count-sm">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    {{ item.clicks or 0 }}
+                </span>
+                {% if item.file_url %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                {% endif %}
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- 标准模式：卡片（含简介） -->
     <div class="standards-list">
         {% for item in items %}
         <a href="/board/{{ board.slug }}/{{ item.id }}" class="standard-card-link">
             <div class="standard-card">
                 <div class="standard-header">
-                    <h2 class="standard-title">{{ item.title }}</h2>
+                    <div class="standard-title-area">
+                        <h2 class="standard-title">{{ item.title }}</h2>
+                        <span class="board-click-count-sm">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            {{ item.clicks or 0 }}
+                        </span>
+                    </div>
+                    {% if item.description %}
+                    <p class="standard-desc">{{ item.description }}</p>
+                    {% endif %}
                     {% if item.file_url %}
                     <span class="netdisk-badge-sm">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -30,6 +62,7 @@
         </a>
         {% endfor %}
     </div>
+    {% endif %}
     {% else %}
     <div class="empty">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">

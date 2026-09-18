@@ -356,6 +356,59 @@ async def api_edit_approved(request: Request, plugin_id: int):
     return {"success": True}
 
 
+@router.post("/admin/api/approved/{plugin_id}/replace-file")
+async def api_replace_file(request: Request, plugin_id: int):
+    """替换插件的文件"""
+    _check_admin(request)
+
+    form = await request.form()
+    file = form.get("file")
+
+    if not file or not file.filename:
+        return JSONResponse({"error": "请选择文件"}, status_code=400)
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return JSONResponse({"error": f"不支持的文件类型: {ext}"}, status_code=400)
+
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM plugins WHERE id=?", (plugin_id,))
+        plugin = await cursor.fetchone()
+        if not plugin:
+            return JSONResponse({"error": "插件不存在"}, status_code=404)
+        plugin = dict(plugin)
+
+        # 删除旧文件
+        old_path = STORAGE_ROOT / plugin["file_path"]
+        if old_path.exists():
+            old_path.unlink()
+
+        # 保存新文件
+        ts = int(time.time())
+        safe_name = f"{ts}_{file.filename}"
+        APPROVED_DIR.mkdir(parents=True, exist_ok=True)
+        save_path = APPROVED_DIR / safe_name
+
+        size = 0
+        with open(save_path, "wb") as f:
+            while chunk := await file.read(64 * 1024):
+                size += len(chunk)
+                if size > MAX_FILE_SIZE:
+                    save_path.unlink(missing_ok=True)
+                    return JSONResponse({"error": "文件过大"}, status_code=413)
+                f.write(chunk)
+
+        # 更新数据库
+        await db.execute(
+            "UPDATE plugins SET file_name=?, file_path=?, file_size=? WHERE id=?",
+            (file.filename, f"approved/{safe_name}", size, plugin_id),
+        )
+        await db.commit()
+
+    logger.info("文件替换: %s (ID: %d)", file.filename, plugin_id)
+    return {"success": True}
+
+
 @router.post("/admin/api/approved/{plugin_id}/toggle-disable")
 async def api_toggle_disable(request: Request, plugin_id: int):
     _check_admin(request)
@@ -646,8 +699,10 @@ async def api_delete_article(request: Request, article_id: int):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @router.get("/admin/api/messages")
-async def api_list_messages(request: Request, status: str = "pending"):
+async def api_list_messages(request: Request, status: str = "pending", limit: int = 300):
     _check_admin(request)
+    # 防止一次渲染上万条把后台卡死；清理请用下方"清理工具"
+    limit = max(1, min(limit, 2000))
     async with get_db() as db:
         base_sql = """SELECT m.*, p.name AS plugin_name,
                              CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END AS is_blocked
@@ -656,12 +711,13 @@ async def api_list_messages(request: Request, status: str = "pending"):
                       LEFT JOIN blocked_ips b ON b.ip_address = m.ip_address"""
         if status == "all":
             cursor = await db.execute(
-                f"{base_sql} ORDER BY m.created_at DESC"
+                f"{base_sql} ORDER BY m.created_at DESC LIMIT ?",
+                (limit,),
             )
         else:
             cursor = await db.execute(
-                f"{base_sql} WHERE m.status=? ORDER BY m.created_at DESC",
-                (status,),
+                f"{base_sql} WHERE m.status=? ORDER BY m.created_at DESC LIMIT ?",
+                (status, limit),
             )
         return [dict(r) for r in await cursor.fetchall()]
 
@@ -741,6 +797,65 @@ async def api_batch_delete_messages(request: Request):
     return {"success": True}
 
 
+@router.post("/admin/api/messages/purge")
+async def api_purge_messages(request: Request):
+    """按条件批量清理留言，可选同时拉黑留言集中的 IP。
+    条件均为可选：status / keyword / before / ip，全部不传则清理全部留言。
+    """
+    _check_admin(request)
+    body = await request.json()
+    status = (body.get("status") or "").strip() or None
+    keyword = (body.get("keyword") or "").strip() or None
+    before = (body.get("before") or "").strip() or None   # YYYY-MM-DD，删除该日期之前的
+    ip = (body.get("ip") or "").strip() or None           # IP 或 IP 段前缀
+    block_ips = bool(body.get("block_ips"))
+    block_min = max(1, int(body.get("block_min") or 5))   # 留言数达到该值的 IP 才拉黑
+
+    conds, params = [], []
+    if status:
+        conds.append("status=?")
+        params.append(status)
+    if keyword:
+        conds.append("(content LIKE ? OR author LIKE ?)")
+        params += [f"%{keyword}%", f"%{keyword}%"]
+    if before:
+        conds.append("date(created_at) < ?")
+        params.append(before)
+    if ip:
+        conds.append("ip_address LIKE ?")
+        params.append(f"{ip}%")
+    where = f"WHERE {' AND '.join(conds)}" if conds else ""
+
+    async with get_db() as db:
+        # 先统计将删除的留言数
+        cursor = await db.execute(f"SELECT COUNT(*) FROM messages {where}", params)
+        total = (await cursor.fetchone())[0]
+
+        # 可选：统计留言集中的 IP 并拉黑（删除前统计）
+        blocked = []
+        if block_ips and total > 0:
+            cursor = await db.execute(
+                f"""SELECT ip_address, COUNT(*) AS c FROM messages {where}
+                    GROUP BY ip_address HAVING c >= ? ORDER BY c DESC""",
+                params + [block_min],
+            )
+            for row in await cursor.fetchall():
+                if not row["ip_address"]:
+                    continue
+                await db.execute(
+                    "INSERT OR IGNORE INTO blocked_ips (ip_address, reason) VALUES (?, ?)",
+                    (row["ip_address"], f"批量清理拉黑（{row['c']}条留言）"),
+                )
+                blocked.append({"ip": row["ip_address"], "count": row["c"]})
+
+        await db.execute(f"DELETE FROM messages {where}", params)
+        await db.commit()
+
+    logger.info("批量清理留言: %d 条 (status=%s keyword=%s before=%s ip=%s 拉黑IP=%d)",
+                total, status or "*", keyword or "-", before or "-", ip or "-", len(blocked))
+    return {"success": True, "deleted": total, "blocked_ips": blocked}
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  板块管理 API（管理前台导航板块及其条目）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -766,6 +881,11 @@ async def api_create_board(request: Request):
     body = await request.json()
     name = body.get("name", "").strip()
     slug = body.get("slug", "").strip()
+    intro = (body.get("intro") or "").strip()
+    hidden = 1 if body.get("hidden") else 0
+    display_style = body.get("display_style", "normal")
+    if display_style not in ("normal", "concise"):
+        display_style = "normal"
     if not name or not slug:
         return JSONResponse({"error": "名称和标识不能为空"}, status_code=400)
     async with get_db() as db:
@@ -775,8 +895,8 @@ async def api_create_board(request: Request):
         cursor = await db.execute("SELECT COALESCE(MAX(sort),-1)+1 FROM boards")
         sort = (await cursor.fetchone())[0]
         cursor = await db.execute(
-            "INSERT INTO boards (name, slug, sort) VALUES (?, ?, ?)",
-            (name, slug, sort),
+            "INSERT INTO boards (name, slug, sort, intro, hidden, display_style) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, slug, sort, intro, hidden, display_style),
         )
         await db.commit()
     logger.info("板块创建: %s (slug=%s)", name, slug)
@@ -789,7 +909,7 @@ async def api_update_board(request: Request, board_id: int):
     body = await request.json()
     sets = []
     params = []
-    for field in ("name", "slug", "sort"):
+    for field in ("name", "slug", "sort", "intro"):
         if field in body:
             val = body[field]
             if field == "slug":
@@ -800,6 +920,14 @@ async def api_update_board(request: Request, board_id: int):
                     if await cursor.fetchone():
                         return JSONResponse({"error": "标识已被使用"}, status_code=400)
             sets.append(f"{field}=?")
+            params.append(val)
+    if "hidden" in body:
+        sets.append("hidden=?")
+        params.append(1 if body["hidden"] else 0)
+    if "display_style" in body:
+        val = body["display_style"]
+        if val in ("normal", "concise"):
+            sets.append("display_style=?")
             params.append(val)
     if sets:
         params.append(board_id)
@@ -849,6 +977,7 @@ async def api_create_board_item(request: Request, board_id: int):
     _check_admin(request)
     body = await request.json()
     title = body.get("title", "").strip()
+    description = (body.get("description") or "").strip()
     file_name = (body.get("file_name") or "").strip()
     file_url = (body.get("file_url") or "").strip()
     if not title:
@@ -863,8 +992,8 @@ async def api_create_board_item(request: Request, board_id: int):
         )
         sort = (await cursor.fetchone())[0]
         cursor = await db.execute(
-            "INSERT INTO board_items (board_id, title, file_name, file_url, sort) VALUES (?, ?, ?, ?, ?)",
-            (board_id, title, file_name, file_url, sort),
+            "INSERT INTO board_items (board_id, title, description, file_name, file_url, sort) VALUES (?, ?, ?, ?, ?, ?)",
+            (board_id, title, description, file_name, file_url, sort),
         )
         await db.commit()
     logger.info("板块条目创建: %s", title)
@@ -877,7 +1006,7 @@ async def api_update_board_item(request: Request, item_id: int):
     body = await request.json()
     sets = []
     params = []
-    for field in ("title", "file_name", "file_url", "sort"):
+    for field in ("title", "description", "file_name", "file_url", "sort"):
         if field in body:
             sets.append(f"{field}=?")
             params.append(body[field])
@@ -1189,3 +1318,67 @@ async def api_reject_unblock(request: Request, req_id: int):
 
     logger.info("解封申请已拒绝: %s (id=%d)", req["ip_address"], req_id)
     return {"success": True, "message": "已拒绝"}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  每日插件点击统计
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.get("/admin/api/stats/daily-plugin-clicks")
+async def api_daily_plugin_clicks(request: Request):
+    """当日每个插件的网盘点击量"""
+    _check_admin(request)
+    from datetime import date
+    today = date.today().isoformat()
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT p.id, p.name, p.download_mode,
+                      COUNT(CASE WHEN cl.event_type = 'netdisk' THEN 1 END) AS click_count,
+                      COUNT(CASE WHEN cl.event_type = 'download' THEN 1 END)
+                        + COUNT(CASE WHEN cl.event_type = 'netdisk' THEN 1 END) / 5 AS download_count
+               FROM click_log cl
+               JOIN plugins p ON p.id = cl.target_id
+               WHERE cl.event_type IN ('netdisk', 'download')
+                 AND date(cl.created_at) = ?
+               GROUP BY p.id
+               ORDER BY click_count DESC, download_count DESC""",
+            (today,),
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+
+        # 总点击次数
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM click_log WHERE event_type='netdisk' AND date(created_at)=?",
+            (today,),
+        )
+        total_clicks = (await cursor.fetchone())[0]
+
+        # 总下载次数（直接下载 + 网盘点击÷5）
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM click_log WHERE event_type='download' AND date(created_at)=?",
+            (today,),
+        )
+        direct_downloads = (await cursor.fetchone())[0]
+        total_downloads = direct_downloads + total_clicks // 5
+
+    return {"items": rows, "total_clicks": total_clicks, "total_downloads": total_downloads, "date": today}
+
+
+@router.get("/admin/api/stats/ip-downloads")
+async def api_ip_downloads(request: Request, date: str, ip: str):
+    """某日某个 IP 下载了哪些插件（直接下载 + 网盘点击）"""
+    _check_admin(request)
+    async with get_db() as db:
+        cursor = await db.execute(
+            """SELECT cl.event_type, cl.created_at,
+                      cl.target_id AS plugin_id,
+                      COALESCE(p.name, '插件已删除') AS plugin_name
+               FROM click_log cl
+               LEFT JOIN plugins p ON p.id = cl.target_id
+               WHERE cl.event_type IN ('download', 'netdisk')
+                 AND date(cl.created_at) = ? AND cl.ip_address = ?
+               ORDER BY cl.created_at DESC""",
+            (date, ip),
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    return {"items": rows, "date": date, "ip": ip}

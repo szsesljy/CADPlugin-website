@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>人机验证 · CAD 插件平台</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+            background: linear-gradient(160deg, #e8edf5 0%, #f4f7fb 100%);
+            min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 20px 12px;
+            -webkit-user-select: none; user-select: none;
+        }
+        .card {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+            box-shadow: 0 10px 34px rgba(30, 58, 138, .10);
+            padding: 22px 20px 16px; width: 360px; max-width: 100%;
+        }
+        .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .head img { width: 38px; height: 38px; }
+        .head h1 { font-size: 17px; color: #0f172a; font-weight: 600; }
+        .head p { font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.5; }
+
+        .stage { position: relative; border-radius: 10px; overflow: hidden;
+                 background: #cbd5e1; touch-action: none; }
+        .stage .bg { display: block; width: 320px; height: 160px; }
+        .stage .piece { position: absolute; top: 0; left: 0; width: 46px; height: 46px;
+                        border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+                        cursor: grab; touch-action: none; }
+        .stage .loading { position: absolute; inset: 0; display: flex; align-items: center;
+                          justify-content: center; gap: 8px; font-size: 13px; color: #475569;
+                          background: #eef2f8; }
+        .loading .spin { width: 16px; height: 16px; border-radius: 50%;
+                         border: 2px solid #c3cede; border-top-color: #2563eb;
+                         animation: rot .8s linear infinite; }
+        @keyframes rot { to { transform: rotate(360deg); } }
+
+        .slider { position: relative; width: 320px; height: 46px; margin-top: 12px;
+                  border-radius: 23px; background: #e8edf5; overflow: hidden;
+                  touch-action: none; }
+        .slider .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+                        background: linear-gradient(90deg, #4f8ef7, #2563eb);
+                        border-radius: 23px 0 0 23px; opacity: .45; }
+        .slider .label { position: absolute; inset: 0; display: flex; align-items: center;
+                         justify-content: center; font-size: 13px; color: #5c6b84;
+                         transition: opacity .15s; pointer-events: none; }
+        .slider .thumb { position: absolute; left: 0; top: 0; width: 46px; height: 46px;
+                         border-radius: 50%; background: #fff; border: 1px solid #dbe2ee;
+                         box-shadow: 0 2px 6px rgba(15, 23, 42, .18);
+                         display: flex; align-items: center; justify-content: center;
+                         cursor: grab; z-index: 2; }
+        .slider .thumb:active { cursor: grabbing; }
+        .slider .thumb svg { width: 18px; height: 18px; stroke: #2563eb; }
+
+        /* 状态 */
+        .status { min-height: 20px; margin-top: 12px; font-size: 13px; text-align: center;
+                  display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .status.ok { color: #16a34a; }
+        .status.err { color: #dc2626; }
+        .status .ic { width: 16px; height: 16px; }
+        .foot { margin-top: 10px; display: flex; align-items: center; justify-content: space-between;
+                font-size: 12px; color: #94a3b8; }
+        .foot a { color: #2563eb; text-decoration: none; cursor: pointer; }
+        .foot a:disabled { color: #94a3b8; cursor: not-allowed; }
+        .page-tip { margin-top: 14px; font-size: 12px; color: #94a3b8; text-align: center; }
+
+        /* 成功/失败动效 */
+        .slider.ok .fill { opacity: 1; width: 100% !important;
+                           background: linear-gradient(90deg, #34c759, #16a34a);
+                           border-radius: 23px; }
+        .slider.ok .thumb { background: #16a34a; border-color: #16a34a; box-shadow: 0 0 0 4px rgba(22,163,74,.15); }
+        .slider.ok .thumb svg { stroke: #fff; }
+        .shake { animation: shake .4s; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); } 40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="head">
+            <img src="/static/logo.svg" alt="">
+            <div>
+                <h1>安全验证</h1>
+                <p>拖动下方滑块，将拼图块对准缺口</p>
+            </div>
+        </div>
+
+        <div class="stage" id="stage">
+            <img class="bg" id="bg" alt="验证背景">
+            <img class="piece hidden" id="piece" alt="拼图块" draggable="false">
+            <div class="loading" id="loading"><span class="spin"></span>正在生成验证图片…</div>
+        </div>
+
+        <div class="slider" id="slider">
+            <div class="fill" id="fill"></div>
+            <div class="label" id="label">按住滑块，向右拖动完成拼图</div>
+            <div class="thumb" id="thumb">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 6 15 12 9 18"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="foot">
+            <a id="refreshBtn">看不清？换一张</a>
+            <span>验证一次，24 小时内免重复</span>
+        </div>
+    </div>
+    <p class="page-tip">人机验证用于防止恶意机器人刷取本站资源</p>
+
+    <script>
+        const NEXT = {{ next | tojson }};
+        const $ = (id) => document.getElementById(id);
+        const bg = $('bg'), piece = $('piece'), stage = $('stage'),
+              slider = $('slider'), thumb = $('thumb'), fill = $('fill'),
+              label = $('label'), statusEl = $('status'), loading = $('loading'),
+              refreshBtn = $('refreshBtn');
+
+        let token = '', startX = 0, dx = 0, dragging = false, busy = false;
+        const THUMB_W = thumb.offsetWidth;
+        const MAX_DRAG = slider.clientWidth - THUMB_W;
+
+        function setStatus(text, type) {
+            statusEl.textContent = text || '';
+            statusEl.className = 'status' + (type ? ' ' + type : '');
+        }
+
+        async function loadChallenge() {
+            busy = true; setStatus(''); refreshBtn.setAttribute('disabled', '1');
+            bg.classList.add('hidden'); piece.classList.add('hidden');
+            loading.classList.remove('hidden');
+            slider.classList.remove('ok');
+            try {
+                const res = await fetch('/verify/challenge', { cache: 'no-store' });
+                if (!res.ok) {
+                    let detail = '';
+                    try { detail = (await res.json()).detail || ''; } catch (e) {}
+                    const err = new Error(detail || '服务器繁忙，请稍后重试');
+                    err.delay = res.status === 429 ? 6000 : 3000;   // 限流时别急着狂刷
+                    throw err;
+                }
+                const data = await res.json();
+                token = data.token;
+                bg.src = data.bg;
+                piece.src = data.piece;
+                piece.style.top = data.y + 'px';
+                piece.style.left = '0px';
+                await Promise.all([imgLoaded(bg), imgLoaded(piece)]);
+                resetDrag(false);
+                piece.classList.remove('hidden');
+                bg.classList.remove('hidden');
+                loading.classList.add('hidden');
+            } catch (e) {
+                loading.classList.add('hidden');
+                bg.classList.remove('hidden');
+                setStatus(e.message || '加载失败，请点击"换一张"重试', 'err');
+                setTimeout(loadChallenge, e.delay || 2500);
+            } finally { busy = false; refreshBtn.removeAttribute('disabled'); }
+        }
+
+        function imgLoaded(img) {
+            return new Promise((ok, no) => {
+                if (img.complete && img.naturalWidth > 0) return ok();
+                img.onload = ok; img.onerror = () => no(new Error('验证图片加载失败'));
+            });
+        }
+
+        function resetDrag(animate) {
+            dx = 0; thumb.style.left = '0px'; piece.style.left = '0px'; fill.style.width = '0px';
+            label.classList.remove('hidden');
+            label.textContent = '按住滑块，向右拖动完成拼图';
+            label.style.color = '';
+        }
+
+        function startDrag(e) {
+            if (busy || slider.classList.contains('ok')) return;
+            e.preventDefault();
+            dragging = true;
+            startX = (e.touches ? e.touches[0].clientX : e.clientX) - dx;
+            label.classList.add('hidden');
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        }
+
+        function onMove(e) {
+            if (!dragging) return;
+            const x = (e.touches ? e.touches[0].clientX : e.clientX);
+            dx = Math.min(MAX_DRAG, Math.max(0, x - startX));
+            thumb.style.left = dx + 'px';
+            piece.style.left = dx + 'px';
+            fill.style.width = Math.min(slider.clientWidth, dx + THUMB_W / 2) + 'px';
+        }
+
+        async function onUp() {
+            if (!dragging) return;
+            dragging = false;
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            if (dx < 8) { resetDrag(true); return; }   // 拖得太短，忽略
+
+            busy = true;
+            thumb.style.cursor = 'wait';
+            label.classList.remove('hidden');
+            label.textContent = '校验中…';
+            label.style.color = '#2563eb';
+            try {
+                const res = await fetch('/verify/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, x: Math.round(dx) }),
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    slider.classList.add('ok');
+                    label.textContent = '验证通过，正在进入…';
+                    label.style.color = '#fff';
+                    setStatus('');
+                    setTimeout(() => { window.location.href = NEXT; }, 500);
+                } else {
+                    failOnce(data.msg || '没对准位置，再试一次');
+                }
+            } catch (e) {
+                failOnce('网络异常，请重试');
+            } finally { busy = false; thumb.style.cursor = ''; }
+        }
+
+        function failOnce(msg) {
+            slider.classList.add('shake');
+            setTimeout(() => slider.classList.remove('shake'), 450);
+            setStatus(msg, 'err');
+            setTimeout(() => {
+                resetDrag(true);
+                loadChallenge();
+            }, 600);
+        }
+
+        thumb.addEventListener('pointerdown', startDrag);
+        piece.addEventListener('pointerdown', startDrag);
+        refreshBtn.addEventListener('click', () => { if (!busy) loadChallenge(); });
+
+        loadChallenge();
+    </script>
+</body>
+</html>

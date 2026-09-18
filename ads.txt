@@ -1,0 +1,5 @@
+google.com, pub-4139915542001756, DIRECT, f08c47fec0942fa0
+
+# ── 其他广告平台 / 转售商请按下面格式逐行添加 ──
+# <广告系统域名>, <发布商 ID>, <DIRECT 或 RESELLER>, <认证标识>
+# 例：adnetwork.com, pub-0000000000000000, DIRECT, abcdef1234567890

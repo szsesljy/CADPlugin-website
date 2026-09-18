@@ -167,11 +167,12 @@ async def init_database():
                 author      TEXT NOT NULL DEFAULT '匿名',
                 content     TEXT NOT NULL,
                 status      TEXT NOT NULL DEFAULT 'approved',
-                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                created_ms  INTEGER DEFAULT 0
             )
         """)
-        # ── 迁移：为已有数据库添加 article_id 列 ──
-        for col in ("article_id", "parent_id"):
+        # ── 迁移：为已有数据库添加 article_id / parent_id / created_ms 列 ──
+        for col in ("article_id", "parent_id", "created_ms"):
             try:
                 await db.execute(f"ALTER TABLE messages ADD COLUMN {col} INTEGER")
             except Exception:
@@ -246,18 +247,18 @@ async def init_database():
             )
         """)
 
-        # ── 迁移：已有留言改为默认通过 ──
-        try:
-            await db.execute("UPDATE messages SET status='approved' WHERE status='pending'")
-        except Exception:
-            pass
-
         # ── 迁移：添加网盘下载字段 ──
         for col in ("netdisk_url", "download_mode"):
             try:
                 await db.execute(f"ALTER TABLE plugins ADD COLUMN {col} TEXT")
             except Exception:
                 pass
+
+        # ── 迁移：添加网盘点击计数 ──
+        try:
+            await db.execute("ALTER TABLE plugins ADD COLUMN netdisk_clicks INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
         # ── 板块表 ──
         await db.execute("""
@@ -290,6 +291,54 @@ async def init_database():
                 "INSERT INTO boards (name, slug, sort) VALUES (?, ?, ?)",
                 ("规范", "standards", 0),
             )
+            await db.execute(
+                "INSERT INTO boards (name, slug, sort) VALUES (?, ?, ?)",
+                ("论文", "papers", 1),
+            )
+
+        # ── 迁移：为板块条目添加点击计数 ──
+        try:
+            await db.execute("ALTER TABLE board_items ADD COLUMN clicks INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
+        # ── 迁移：为板块添加简介和显隐开关 ──
+        try:
+            await db.execute("ALTER TABLE boards ADD COLUMN intro TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE boards ADD COLUMN hidden INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE boards ADD COLUMN display_style TEXT DEFAULT 'normal'")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE board_items ADD COLUMN description TEXT DEFAULT ''")
+        except Exception:
+            pass
+
+        # ── 迁移：为插件添加浏览次数 ──
+        try:
+            await db.execute("ALTER TABLE plugins ADD COLUMN view_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
+        # ── 点击事件日志表（记录各种点击行为） ──
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS click_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type  TEXT NOT NULL,
+                target_id   INTEGER DEFAULT 0,
+                target_type TEXT DEFAULT '',
+                ip_address  TEXT DEFAULT '',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_click_log_event ON click_log(event_type)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_click_log_date ON click_log(created_at)")
 
         await db.commit()
 
