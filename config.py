@@ -28,4 +28,8 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "cad-platform-secret-key-change-it")
 
+# 手机版站点：域名以该前缀开头时启用移动端布局（底部导航栏、隐藏桌面导航等）
+# 例如 "phone." 时，phone.example.com 走手机版布局；留空则关闭
+MOBILE_SITE_HOST_PREFIX = os.getenv("MOBILE_SITE_HOST_PREFIX", "phone.")
+
 ITEMS_PER_PAGE = 12

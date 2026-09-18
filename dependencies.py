@@ -2,7 +2,7 @@ import logging
 import sqlite3
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
-from config import TEMPLATES_DIR, DATABASE_PATH
+from config import TEMPLATES_DIR, DATABASE_PATH, MOBILE_SITE_HOST_PREFIX
 from database import get_db
 from geoip import ip_region
 
@@ -28,9 +28,10 @@ def inject_globals(request: Request):
         conn.close()
     except Exception:
         ctx["boards"] = []
-    # 检测子域名
-    host = request.headers.get("host", "")
-    ctx["is_mobile_site"] = host.startswith("phone.") or "phone.cadchajian" in host
+    # 检测手机版子域名（前缀由 config.MOBILE_SITE_HOST_PREFIX 配置）
+    host = (request.headers.get("host") or "").lower()
+    prefix = MOBILE_SITE_HOST_PREFIX.strip().lower()
+    ctx["is_mobile_site"] = bool(prefix) and host.startswith(prefix)
     return ctx
 
 
